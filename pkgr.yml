@@ -1,0 +1,22 @@
+Version: 1
+
+Packages:
+  - tidyverse
+  - mrgsolve
+  - caTools
+  - bitops
+  - rprojroot
+  - metrumrg
+  - rmarkdown
+  - PopED
+
+Repos:
+  - MPN: https://mpn.metworx.com/snapshots/stable/2020-03-07/
+
+Customizations:
+  Packages:
+  - metrumrg:
+      Suggests: true
+      
+Lockfile:
+    Type: renv

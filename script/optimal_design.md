@@ -1,0 +1,271 @@
+---
+title: "Optimal Design for PK/PD"
+order: 99
+tags: ["science-resources", "optimal design", "poped"]
+output: 
+  md_document:
+    preserve_yaml: true
+    variant: "gfm"
+---
+
+This document gives a brief background on optimal design of experiments
+and how it can be applied to studies involving PK/PD models. We give an
+example of PK sampling time selection using the R package
+[`PopED`](https://cran.r-project.org/web/packages/PopED/index.html). If
+you don’t care about how this works (although you probably should), you
+can skip the background.
+
+# Background
+
+PK/PD studies should be designed in such a way that model parameters can
+be estimated with adequate precision and bias. This can be assessed by
+simulation, but depending on the study and model(s) involved, it can be
+impractical to evaluate many combinations of design variables. Optimal
+design tools allow us to quickly (however approximately) evaluate
+designs, and even search over a design space for the best possible
+design.
+
+## Fisher information matrix
+
+As the name implies, optimal designs are experimental designs that are
+optimal with respect to some criterion. Many such criteria exist, but
+most involve the [Fisher information
+matrix](https://en.wikipedia.org/wiki/Fisher_information) (FIM). This
+matrix is useful because it gives us a [lower
+bound](https://en.wikipedia.org/wiki/Cram%C3%A9r%E2%80%93Rao_bound) on
+the covariance matrix of our parameter estimates.
+
+The most commonly used criterion is the *D*-optimalilty criterion.
+*D*-optimal designs maximize the determinant of the FIM, which is
+equivalent to minimizing the (lower bound of) the determinant of the
+covariance matrix of the parameter estimates. For a single parameter,
+this means we’re minimizing the width of its confidence interval,
+estimating it as precisely as possible. Extending this to multiple
+parameters, we’re minimizing the volume of the confidence ellipsoid,
+which loosely translates to maximizing the overall precision of
+parameter estimates.
+
+The FIM is typically notated by something like *M*<sub>*F*</sub>(Φ,Ξ),
+where Φ is the vector of parameter values (e.g. *CL*, ω<sub>*CL*</sub>,
+etc.) and Ξ is the vector of design variables (e.g. dose levels, PK
+sampling times, etc.). For linear models, the dependence on the
+parameters disappears. Unfortunately for us, this is not the case for
+nonlinear models. So in order to design our experiment in a way that
+will produce the best parameter estimates, we first need to know the
+values of those parameters. This is the catch-22 of optimal design. The
+good news is that we usually have *some* sense of parameter values from
+earlier clinical trials or even predictions from animal data. We can
+even incorporate uncertainty of the estimates (e.g. with *ED*- or
+*HC*ln*D*-optimality).
+
+## Nonlinear mixed effects models
+
+More often than not, we’re dealing with nonlinear mixed effects (NLME)
+models. Since the FIM depends on the likelihood function, and there is
+sadly no analytic expression for the likelihood in NLME models, we must
+rely on approximations. See Mentre1997-ds, Retout2001-lw, and
+Retout2003-jx for FIM approximations available to us.
+
+So our FIM is
+
+  - an approximation
+  - to a lower bound
+  - that depends on the parameter values.
+
+How useful could that even be? Pretty useful, actually. In most cases
+you’ll probably find that you have adequate information on parameter
+estimates and that these approximate lower bounds aren’t too far off
+what you’ll get from simulations.
+
+Either way, I **strongly** recommend that any optimal design exercise is
+capped off with confirmatory simulations using the tool (e.g. NONMEM)
+that you’ll be using in the actual analysis of the data.
+
+## Evaluation vs Optimization
+
+Optimal design tools can be used in the way that the name implies (to
+actually optimize a study), or we can simply evaluate a design with a
+quick calculation of the FIM (and a translation of the FIM to expected
+relative standard errors). Optimization is usually a “last resort”, and
+most of the time you’ll only need to evaluate a few potential designs
+before settling on the answer.
+
+That’s not to say that optimization doesn’t have its place. For example,
+resources may be very tightly constrained, or intuitive selection of
+potential doses or sampling times doesn’t produce sufficient results. In
+these cases, we’d use a search algorithm to determine an optimal design.
+
+## Sampling windows
+
+A common application of optimal design is the selection of PK sampling
+times. In practice, we often can’t practically collect PK samples at
+precise times. Also, optimization of sampling times will usually tell
+you to collect samples at seemingly bizarre times like 3.4756 hours. Or
+worse, it may require *multiple* samples at the same time (if you can’t
+specify a minimum period between samples). In these cases, we can
+specify windows of time for each collection.
+
+Although methods exist for optimal determination of the windows, you
+will mostly likely be able to do a perfectly good job yourself by
+picking these manually. You can then determine the suitability of the
+windows by seeing how uniform sampling within the windows impacts
+relative standard errors (both in optimal design tools like `PopED` or
+in your simulation).
+
+TODO explain what we’re doing in PopED example TODO sampling windows in
+example TODO SSE for example
+
+# Packages and setup
+
+``` r
+requireNamespace("metrumrg")
+library(tidyverse)
+library(mrgsolve)
+library(PopED)
+```
+
+# The model
+
+``` r
+mod <- mread(file.path("model", "model_poped.cpp"))
+see(mod)
+```
+
+    . 
+    . Model file:  model_poped.cpp 
+    . [ pkmodel ] cmt="DEPOT CENT PERI", depot=TRUE, trans = 11
+    . 
+    . [ param ]
+    . CL=20, VC=70, Q=1, VP=30, KA = 0.25, WT= 70
+    . 
+    . [ main ]
+    . double CLi = CL*pow(WT/70,0.75);
+    . double V2i = VC*(WT/70);
+    . double Qi  = Q*pow(WT/70,0.75);
+    . double V3i = VP*(WT/70);
+    . double KAi = KA;
+    . 
+    . [ table ]
+    . capture CP = CENT/V2i ;
+
+The important part here is that we have a PK model parameters that are a
+function of a covariate (`WT`) and `WT` is listed as a parameter.
+
+# Example simulation
+
+``` r
+data <- 
+  expand.ev(amt=c(4,4,8,15)) %>% 
+  mutate(ID=1:4, dose = amt*10, amt=amt*10000, WT=c(35,70,70,70))
+
+out <- 
+  mod %>% 
+  data_set(data) %>% 
+  Req(CP) %>% 
+  carry_out(dose) %>% 
+  mrgsim(end=48, delta=0.1)
+
+plot(out,logy=TRUE)
+```
+
+![](optimal_design_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+
+# The PopED setup
+
+I am using `mrgsim_q` to get the simulation turned around as quickly as
+possible, reducing overhead (and dropping features).
+
+``` r
+ff <- function(model_switch, xt, p, poped.db){
+  times_xt <- drop(xt)  
+  dose_times <- 0
+  time <- sort(unique(c(times_xt,dose_times)))
+  is.dose <- time %in% dose_times
+  
+  data <- data.frame(
+    ID = 1,
+    time = time,
+    amt = ifelse(is.dose,p[["DOSE"]], 0), 
+    cmt = ifelse(is.dose, 1, 0)
+  )
+  
+  data[["evid"]] <- data[["cmt"]]
+  
+  mod <- param(mod, as.list(p))
+  
+  out <- mrgsim_q(mod,data,recsort=4)
+  
+  y <- out$CP[match(times_xt,out$time)]
+  
+  return(list(y=matrix(y,ncol=1),poped.db=poped.db))
+}
+```
+
+``` r
+sfg.mrgsolve.cov <- function(x,a,bpop,b,bocc){
+  parameters=c(CL=bpop[1]*exp(b[1]),
+               VC=bpop[2]*exp(b[2]),
+               Q=bpop[3],
+               VP=bpop[4],
+               KA=bpop[5],
+               DOSE=a[1],
+               TAU =a[2],
+               WT  =a[3]
+  )
+  return(parameters) 
+}
+```
+
+``` r
+feps <- function(model_switch,xt,parameters,epsi,poped.db){
+  returnArgs <- do.call(poped.db$model$ff_pointer,list(model_switch,xt,parameters,poped.db)) 
+  y <- returnArgs[[1]]
+  poped.db <- returnArgs[[2]]
+  y = y*exp(epsi[,1])
+  return(list( y= y,poped.db =poped.db )) 
+}
+```
+
+``` r
+poped.cov_mrg_poped <- create.poped.database(
+  ff_fun=ff,
+  fg_fun=sfg.mrgsolve.cov,
+  fError_fun=feps,
+  bpop=c(CL=20, VC=70,Q=1, VP=30, KA=0.25), 
+  notfixed_bpop=c(1,1,1,0,0),
+  d=c(CL=0.08,VC=0.1), 
+  sigma=c(0.05),
+  notfixed_sigma=c(1),
+  m=2,
+  groupsize=6,
+  xt=list(c(3,5,8,18),c(1,6,50,120)),
+  minxt=0,
+  maxxt=120,
+  bUseGrouped_xt=0,
+  a = cbind(DOSE=c(250,250), TAU=c(12,12),WT=c(35,70))
+)
+```
+
+# Plot a model prediction
+
+``` r
+plot_model_prediction(poped.cov_mrg_poped,model_num_points = 5000) + theme_bw()
+```
+
+![](optimal_design_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+# Evaluate FIM
+
+``` r
+FIM <- evaluate.fim(poped.cov_mrg_poped) 
+det(FIM)
+```
+
+    . [1] 1156581048
+
+``` r
+get_rse(FIM, poped.cov_mrg_poped)
+```
+
+    .    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2] SIGMA[1,1] 
+    .   8.623108  11.623841   6.265507  44.971291  67.513263  28.662762
