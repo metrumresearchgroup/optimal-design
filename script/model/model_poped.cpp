@@ -1,13 +1,14 @@
 [ pkmodel ] cmt="DEPOT CENT PERI", depot=TRUE, trans = 11
 
 [ param ]
-CL=20, VC=70, Q=1, VP=30, KA = 0.25, WT= 70
+CL=10, V2=100, Q=1, V3=30, KA = 0.25, WT= 70,
+  wt_cl = 0.75, wt_v = 1
 
 [ main ]
-double CLi = CL*pow(WT/70,0.75);
-double V2i = VC*(WT/70);
-double Qi  = Q*pow(WT/70,0.75);
-double V3i = VP*(WT/70);
+double CLi = CL * pow(WT/70, wt_cl);
+double V2i = V2 * pow(WT/70, wt_v);
+double Qi  = Q * pow(WT/70, wt_cl);
+double V3i = V3 * pow(WT/70, wt_v);
 double KAi = KA;
 
 [ table ]
