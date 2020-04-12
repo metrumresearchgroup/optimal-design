@@ -1,12 +1,11 @@
----
-title: "Optimal Design for PK/PD"
-order: 99
-tags: ["science-resources", "optimal design", "poped"]
-output: 
-  md_document:
-    preserve_yaml: true
-    variant: "gfm"
----
+Optimal Design for PK/PD
+================
+
+TODO
+
+  - optimise in example
+  - sampling windows in example
+  - SSE for example
 
 This document gives a brief background on optimal design of experiments
 and how it can be applied to studies involving PK/PD models. We give an
@@ -112,12 +111,6 @@ windows by seeing how uniform sampling within the windows impacts
 relative standard errors (both in optimal design tools like `PopED` or
 in your simulation).
 
-TODO explain what we’re doing in PopED example
-
-TODO sampling windows in example
-
-TODO SSE for example
-
 # Packages and setup
 
 ``` r
@@ -178,6 +171,11 @@ incorporating the `PopED` functions.
 
 ``` r
 mod <- mread(file.path("model", "model_poped"))
+```
+
+    . Building model_poped ... done.
+
+``` r
 see(mod)
 ```
 
@@ -389,6 +387,13 @@ p +
   ggtitle("Day 1")
 ```
 
+    . Scale for 'x' is already present. Adding another scale for 'x', which will
+    . replace the existing scale.
+
+    . Warning: Removed 181 row(s) containing missing values (geom_path).
+
+    . Warning: Removed 7 rows containing missing values (geom_point).
+
 ![](optimal_design_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
 
 ``` r
@@ -401,6 +406,10 @@ p +
   ggtitle("Steady state")
 ```
 
+    . Warning: Removed 26 row(s) containing missing values (geom_path).
+
+    . Warning: Removed 1 rows containing missing values (geom_point).
+
 ![](optimal_design_files/figure-gfm/unnamed-chunk-11-2.png)<!-- -->
 
 # Evaluate FIM
@@ -412,6 +421,11 @@ det(FIM)
 
     . [1] -9.219963e-15
 
+This determinant is what will be used to optimize the design, but it’s
+not particularly helpful by itself. What we really need are the
+predicted standard errors based on the
+    FIM.
+
 ``` r
 get_rse(FIM, poped_db)
 ```
@@ -420,3 +434,81 @@ get_rse(FIM, poped_db)
     . 3.288920e+07 3.832763e+08 1.727472e+08 9.886069e+07 5.931642e+08 2.577806e+01 
     .       D[2,2]   SIGMA[1,1] 
     . 3.482720e+01 9.568598e+00
+
+This is clearly not an informative design. After some behind-the-scenes
+experimentation, it turns out that if we fix `V3` we start to get more
+reasonable estimates.
+
+## Fix `V3` and `KA`
+
+``` r
+poped_db_fix_v3ka <- create.poped.database(
+  popedInput = poped_db,
+  notfixed_bpop = c(1, 1, 1, 0, 0)
+)
+FIM_fix_v3ka <- evaluate.fim(poped_db_fix_v3ka) 
+get_rse(FIM_fix_v3ka, poped_db_fix_v3ka)
+```
+
+    .    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2] SIGMA[1,1] 
+    .   5.264741   7.074895   1.690068  25.778059  34.827202   9.568598
+
+Wonderful\! The proposed design would do nicely in this situation, but
+unfortunately while we’re OK with fixing `V3`, we really do need to
+estimate `KA` in kids.
+
+## Fix `V3` only
+
+``` r
+poped_db_fix_v3 <- create.poped.database(
+  popedInput = poped_db,
+  notfixed_bpop = c(1, 1, 1, 0, 1)
+)
+FIM_fix_v3 <- evaluate.fim(poped_db_fix_v3) 
+get_rse(FIM_fix_v3, poped_db_fix_v3)
+```
+
+    .      bpop[1]      bpop[2]      bpop[3]      bpop[5]       D[1,1]       D[2,2] 
+    . 2.255571e+07 2.741188e+08 3.445573e+07 4.194304e+08 2.577806e+01 3.482720e+01 
+    .   SIGMA[1,1] 
+    . 9.568598e+00
+
+We’re back to where we started, pretty much. That first sample at 5
+hours occurs at pretty much t<sub>max</sub>. Let’s see what happens if
+we move it to a little earlier.
+
+## Earlier first sample
+
+``` r
+poped_db_early_first <- create.poped.database(
+  popedInput = poped_db,
+  notfixed_bpop = c(1, 1, 1, 0, 1),
+  xt = c(3, c(rep(24, 6), 168) + 24),
+)
+FIM_early_first <- evaluate.fim(poped_db_early_first) 
+get_rse(FIM_early_first, poped_db_early_first)
+```
+
+    . Problems inverting the matrix. Results could be misleading.
+
+    .      bpop[1]      bpop[2]      bpop[3]      bpop[5]       D[1,1]       D[2,2] 
+    .  5.024396037  0.007603939  1.843490852  8.569588166 25.620796280 33.389430991 
+    .   SIGMA[1,1] 
+    .  9.579023352
+
+This is
+
+``` r
+1
+```
+
+    . [1] 1
+
+# Other resources
+
+  - `PopED` vignette: [Introduction to
+    `PopED`](https://cran.r-project.org/web/packages/PopED/vignettes/intro-poped.html)
+  - `PopED` vignette:
+    [Examples](https://cran.r-project.org/web/packages/PopED/vignettes/intro-poped.html)
+  - mrgsolve wiki: [`PopED`
+    vignette](https://github.com/metrumresearchgroup/mrgsolve/wiki/PopED_vignette)
