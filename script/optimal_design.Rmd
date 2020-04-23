@@ -250,9 +250,9 @@ poped_db <- create.poped.database(
   sigma = c(0.05),
   notfixed_sigma = c(1),
   m = 1,
-  groupsize = 36,
+  groupsize = 12,
   xt = c(5, c(rep(24, 6), 168) + 24),
-  minxt = c(0, c(rep(24, 6), 168) + 24 - 1),
+  minxt = c(1, c(rep(24, 6), 168) + 24 - 1),
   maxxt = c(6, c(rep(24, 6), 168) + 24),
   bUseGrouped_xt = 0,
   a = cbind(DOSE = 10, TAU = 24, WT = 32)
@@ -375,13 +375,22 @@ We can live with fixing those parameters.  The RSEs are looking pretty good, but
 
 # *D*-optimal design
 
+## Starting from the original design
+
 ```{r optimal,cache=TRUE,message=FALSE,results='hide'}
-set.seed(123)
 output <- poped_optim(
   poped_db_fix_qv3,
   opt_xt = TRUE,
-  parallel = TRUE
+  parallel = TRUE,
+  parallel_type = "multicore",
+  seed = 1
 )
+saveRDS(output, "opt1.rds")
+```
+
+```{r}
+output <- readRDS("opt1.rds")
+summary(output)
 ```
 
 
