@@ -3,8 +3,7 @@ Optimal Design for PK/PD
 
 TODO
 
-  - optimise in example
-  - sampling windows in example
+  - more detail about create.poped.database
   - SSE for example
 
 This document gives a brief background on optimal design of experiments
@@ -358,13 +357,58 @@ poped_db <- create.poped.database(
   sigma = c(0.05),
   notfixed_sigma = c(1),
   m = 1,
-  groupsize = 36,
+  groupsize = 12,
   xt = c(5, c(rep(24, 6), 168) + 24),
-  minxt = 0,
-  maxxt = 168 + 24,
+  minxt = c(1, c(rep(24, 6), 168) + 24 - 1),
+  maxxt = c(6, c(rep(24, 6), 168) + 24),
   bUseGrouped_xt = 0,
   a = cbind(DOSE = 10, TAU = 24, WT = 32)
 )
+```
+
+We’ve covered the functions used in the first 3 arguments. Let’s break
+down the rest.
+
+``` r
+  bpop = c(CL = 10, V2 = 100, Q = 1, V3 = 30, KA = 0.25), 
+```
+
+``` r
+  notfixed_bpop = c(1, 1, 1, 1, 1),
+```
+
+``` r
+  d = c(CL = 0.08, V2 = 0.1), 
+```
+
+``` r
+  sigma = c(0.05),
+```
+
+``` r
+  notfixed_sigma = c(1),
+```
+
+``` r
+  m = 1,
+  groupsize = 36,
+```
+
+``` r
+  xt = c(5, c(rep(24, 6), 168) + 24),
+```
+
+``` r
+  minxt = c(0, c(rep(24, 6), 168) + 24 - 1),
+  maxxt = c(6, c(rep(24, 6), 168) + 24),
+```
+
+``` r
+  bUseGrouped_xt = 0,
+```
+
+``` r
+  a = cbind(DOSE = 10, TAU = 24, WT = 32)
 ```
 
 ## Test plot
@@ -390,11 +434,11 @@ p +
     . Scale for 'x' is already present. Adding another scale for 'x', which will
     . replace the existing scale.
 
-    . Warning: Removed 181 row(s) containing missing values (geom_path).
+    . Warning: Removed 182 row(s) containing missing values (geom_path).
 
     . Warning: Removed 7 rows containing missing values (geom_point).
 
-![](optimal_design_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+![](optimal_design_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
 
 ``` r
 p +
@@ -406,11 +450,11 @@ p +
   ggtitle("Steady state")
 ```
 
-    . Warning: Removed 26 row(s) containing missing values (geom_path).
+    . Warning: Removed 25 row(s) containing missing values (geom_path).
 
     . Warning: Removed 1 rows containing missing values (geom_point).
 
-![](optimal_design_files/figure-gfm/unnamed-chunk-11-2.png)<!-- -->
+![](optimal_design_files/figure-gfm/unnamed-chunk-21-2.png)<!-- -->
 
 # Evaluate FIM
 
@@ -419,7 +463,7 @@ FIM <- evaluate.fim(poped_db)
 det(FIM)
 ```
 
-    . [1] -9.219963e-15
+    . [1] -1.090434e-18
 
 This determinant is what will be used to optimize the design, but it’s
 not particularly helpful by itself. What we really need are the
@@ -430,79 +474,173 @@ predicted standard errors based on the
 get_rse(FIM, poped_db)
 ```
 
-    .      bpop[1]      bpop[2]      bpop[3]      bpop[4]      bpop[5]       D[1,1] 
-    . 3.288920e+07 3.832763e+08 1.727472e+08 9.886069e+07 5.931642e+08 2.577806e+01 
-    .       D[2,2]   SIGMA[1,1] 
-    . 3.482720e+01 9.568598e+00
-
-This is clearly not an informative design. After some behind-the-scenes
-experimentation, it turns out that if we fix `V3` we start to get more
-reasonable estimates.
-
-## Fix `V3` and `KA`
-
-``` r
-poped_db_fix_v3ka <- create.poped.database(
-  popedInput = poped_db,
-  notfixed_bpop = c(1, 1, 1, 0, 0)
-)
-FIM_fix_v3ka <- evaluate.fim(poped_db_fix_v3ka) 
-get_rse(FIM_fix_v3ka, poped_db_fix_v3ka)
-```
-
-    .    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2] SIGMA[1,1] 
-    .   5.264741   7.074895   1.690068  25.778059  34.827202   9.568598
-
-Wonderful\! The proposed design would do nicely in this situation, but
-unfortunately while we’re OK with fixing `V3`, we really do need to
-estimate `KA` in kids.
-
-## Fix `V3` only
-
-``` r
-poped_db_fix_v3 <- create.poped.database(
-  popedInput = poped_db,
-  notfixed_bpop = c(1, 1, 1, 0, 1)
-)
-FIM_fix_v3 <- evaluate.fim(poped_db_fix_v3) 
-get_rse(FIM_fix_v3, poped_db_fix_v3)
-```
-
-    .      bpop[1]      bpop[2]      bpop[3]      bpop[5]       D[1,1]       D[2,2] 
-    . 2.255571e+07 2.741188e+08 3.445573e+07 4.194304e+08 2.577806e+01 3.482720e+01 
-    .   SIGMA[1,1] 
-    . 9.568598e+00
-
-We’re back to where we started, pretty much. That first sample at 5
-hours occurs at pretty much t<sub>max</sub>. Let’s see what happens if
-we move it to a little earlier.
-
-## Earlier first sample
-
-``` r
-poped_db_early_first <- create.poped.database(
-  popedInput = poped_db,
-  notfixed_bpop = c(1, 1, 1, 0, 1),
-  xt = c(3, c(rep(24, 6), 168) + 24),
-)
-FIM_early_first <- evaluate.fim(poped_db_early_first) 
-get_rse(FIM_early_first, poped_db_early_first)
-```
-
     . Problems inverting the matrix. Results could be misleading.
 
-    .      bpop[1]      bpop[2]      bpop[3]      bpop[5]       D[1,1]       D[2,2] 
-    .  5.024396037  0.007603939  1.843490852  8.569588166 25.620796280 33.389430991 
-    .   SIGMA[1,1] 
-    .  9.579023352
+    .      bpop[1]      bpop[2]      bpop[3]      bpop[4]      bpop[5]       D[1,1] 
+    .  8.884258291  0.007267779  3.809165606  0.021224874 18.751630938 44.648907308 
+    .       D[2,2]   SIGMA[1,1] 
+    . 60.322482797 16.573298431
 
-This is
+This is clearly not an informative design. After some behind-the-scenes
+experimentation, it turns out that if we fix `Q` and `V3` we start to
+get more reasonable estimates.
+
+## Fix `Q` and `V3`
 
 ``` r
-1
+poped_db_fix_qv3 <- create.poped.database(
+  popedInput = poped_db,
+  notfixed_bpop = c(1, 1, 0, 0, 1)
+)
+FIM_fix_qv3 <- evaluate.fim(poped_db_fix_qv3) 
+get_rse(FIM_fix_qv3, poped_db_fix_qv3)
 ```
 
-    . [1] 1
+    .    bpop[1]    bpop[2]    bpop[5]     D[1,1]     D[2,2] SIGMA[1,1] 
+    .   9.870502  30.301349  35.633880  44.648907  60.322483  16.573298
+
+We can live with fixing those parameters. The RSEs are looking pretty
+good, but let’s see if we can make any improvements with optimization.
+
+# *D*-optimal design
+
+## Starting from the original design
+
+``` r
+output <- poped_optim(
+  poped_db_fix_qv3,
+  opt_xt = TRUE,
+  parallel = TRUE,
+  parallel_type = "multicore",
+  seed = 1
+)
+saveRDS(output, "opt1.rds")
+```
+
+``` r
+output <- readRDS("opt1.rds")
+summary(output)
+```
+
+    . ===============================================================================
+    . FINAL RESULTS
+    . Optimized Sampling Schedule
+    . Group 1:      6     47     47     47     47     47     47    192
+    . 
+    . OFV = 22.5902
+    . 
+    . Efficiency: 
+    .   ((exp(ofv_final) / exp(ofv_init))^(1/n_parameters)) = 1.0685
+    . 
+    . Expected relative standard error
+    . (%RSE, rounded to nearest integer):
+    .     Parameter   Values   RSE_0   RSE
+    .       bpop[1]       10      10     9
+    .       bpop[2]      100      30    24
+    .       bpop[5]     0.25      36    27
+    .        D[1,1]     0.08      45    45
+    .        D[2,2]      0.1      60    63
+    .    SIGMA[1,1]     0.05      17    17
+    . 
+    . Total running time: 123.909 seconds
+
+``` r
+summary(output)
+```
+
+    . ===============================================================================
+    . FINAL RESULTS
+    . Optimized Sampling Schedule
+    . Group 1:      6     47     47     47     47     47     47    192
+    . 
+    . OFV = 22.5902
+    . 
+    . Efficiency: 
+    .   ((exp(ofv_final) / exp(ofv_init))^(1/n_parameters)) = 1.0685
+    . 
+    . Expected relative standard error
+    . (%RSE, rounded to nearest integer):
+    .     Parameter   Values   RSE_0   RSE
+    .       bpop[1]       10      10     9
+    .       bpop[2]      100      30    24
+    .       bpop[5]     0.25      36    27
+    .        D[1,1]     0.08      45    45
+    .        D[2,2]      0.1      60    63
+    .    SIGMA[1,1]     0.05      17    17
+    . 
+    . Total running time: 123.909 seconds
+
+``` r
+p <- plot_model_prediction(output$poped.db, model_num_points = 200) +
+  labs(x = "Time from dose (h)") +
+  theme_bw()
+p +
+  xlim(0, 24) +
+  scale_x_continuous(
+    lim = c(0, 24),
+    breaks = seq(0, 24, by = 6)
+  ) +
+  ggtitle("Day 1")
+```
+
+    . Scale for 'x' is already present. Adding another scale for 'x', which will
+    . replace the existing scale.
+
+    . Warning: Removed 183 row(s) containing missing values (geom_path).
+
+    . Warning: Removed 7 rows containing missing values (geom_point).
+
+![](optimal_design_files/figure-gfm/unnamed-chunk-26-1.png)<!-- -->
+
+``` r
+p +
+  scale_x_continuous(
+    lim = c(0, 168) + 24,
+    breaks = seq(0, 168, by = 24) + 24,
+    labels = seq(0, 168, by = 24)
+  ) +
+  ggtitle("Steady state")
+```
+
+    . Warning: Removed 25 row(s) containing missing values (geom_path).
+
+    . Warning: Removed 1 rows containing missing values (geom_point).
+
+![](optimal_design_files/figure-gfm/unnamed-chunk-26-2.png)<!-- -->
+
+We didn’t have a whole lot of wiggle room in the design space, so our
+design (and RSEs) haven’t changed much. The Day 1 sample got pushed to
+the maximum allowable (6 hours), and the trough samples got pushed back
+to the earliest allowable (1 hour before dosing).
+
+# Sampling windows
+
+Next, we’ll construct windows around our sampling times to provide some
+flexibility in sampling. We evaluate the effect of this flexibility on
+the RSEs.
+
+We’ll allow:
+
+  - up to 2 hours before the first sample at 6 hours (i.e., 4-6 hours
+    post dose)
+  - up to 1 hour after the trough sample (i.e., 0-1 hours pre dose)
+  - up to 4 hours before the final sample (i.e., 164-168 hours post
+    final dose)
+
+<!-- end list -->
+
+``` r
+plot_efficiency_of_windows(
+  output$poped.db,
+  xt_plus  = c(0, rep(1, 6), 0),
+  xt_minus = c(2, rep(0, 6), 4)
+)
+```
+
+![](optimal_design_files/figure-gfm/unnamed-chunk-27-1.png)<!-- -->
+
+The 100 sets of simulated samples show no significant deviations from
+the RSEs for the optimal samples.
 
 # Other resources
 
