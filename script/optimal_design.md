@@ -3,7 +3,6 @@ Optimal Design for PK/PD
 
 TODO
 
-  - more detail about create.poped.database
   - mrgsolve mode: something more complex, like M-M CL
   - SSE for examples
 
@@ -132,20 +131,20 @@ sufficiently estimate the PK parameters in pediatric patients.
 
 Population
 
-  - 36 subjects
+  - 12 subjects
   - Aged 6 to \< 12
   - Expected median weight of 32 kg
 
 Treatment
 
-  - 10 mg QD mockdrozaline for 52 weeks
+  - 10 mg QD mockdrozaline for 24 weeks
 
 PK samples
 
   - Proposed samples:
-      - 5 hours postdose on Day 1,
-      - predose on Weeks 4, 8, 12, 18, 36, 52,
-      - 24 and 168 hours after the final dose
+      - 5 hours postdose on Day 1;
+      - predose on Weeks 8, 12, 24; and
+      - 168 hours after the final dose
 
 ## The model
 
@@ -158,15 +157,16 @@ and weight on volume (`wt_v`).
 | -: | --: | ---: | -----: | ----: |
 | 10 | 100 | 0.25 |   0.75 |     1 |
 
-We include log-normal IIV on `CL`, `V`, and `KA`, and a log-normal
-residual error.
+We include log-normal IIV on `CL`, `V`, and `KA`, and a combined
+additive and proportional residual error.
 
-| om\_CL | om\_V | om\_KA | sigma |
-| -----: | ----: | -----: | ----: |
-|   0.08 |   0.1 |    0.2 |  0.05 |
+| om\_CL | om\_V | om\_KA | sigma\_prop | sigma\_add |
+| -----: | ----: | -----: | ----------: | ---------: |
+|   0.08 |   0.1 |    0.2 |        0.05 |          1 |
 
-Note that we reach steady state very quickly, so we can assume that all
-samples after Day 1 (i.e. from Week 4 onward) are at steady state.
+Note that we reach steady state very quickly (the half-life is around 7
+hours), so we can assume that all samples after Day 1 (i.e. from Week 4
+onward) are at steady state.
 
 # The `PopED` setup
 
@@ -197,10 +197,9 @@ with the following arguments:
   - `poped.db`: A `PopED` database. This can be used to extract
     information that may be needed in the model file.
 
-We use a single dose at time 0 and a steady-state dose at 24 hours. We
-do this to simplify the design: anything on Day 1 will be evaluated
-between 0 and 24 hours; and anything past Day 1 (at steady state) will
-be evaluated after 24 hours.
+We define a model with single dose and steady-state components, making
+use of the `model_switch` argument to determine which expression to use
+at each timepoint.
 
 ``` r
 ff <- function(model_switch, xt, parameters, poped.db){
@@ -209,18 +208,18 @@ ff <- function(model_switch, xt, parameters, poped.db){
     CL <- CL*(WT/70)^(WT_CL)
     V <- V*(WT/70)^(WT_V)
     
-    xt_sd <- xt[xt <= 24]
-    xt_ss <- xt[xt > 24]
-    xt_ss <- xt_ss - 24
-    
     y_sd <- (DOSE * KA/(V * (KA - CL/V))) *
-      (exp(-CL/V * xt_sd) - exp(-KA * xt_sd))
+      (exp(-CL/V * xt) - exp(-KA * xt))
     
     y_ss <- (DOSE * KA/(V * (KA - CL/V))) *
-      (exp(-CL/V * xt_ss) / (1 - exp(-CL/V * TAU)) -
-         exp(-KA * xt_ss) / (1 - exp(-KA * TAU)))
+      (exp(-CL/V * xt) / (1 - exp(-CL/V * TAU)) -
+         exp(-KA * xt) / (1 - exp(-KA * TAU)))
+    
+    y <- xt
+    y[model_switch == 1] <- y_sd[model_switch == 1]
+    y[model_switch == 2] <- y_ss[model_switch == 2]
       
-    return(list(y = c(y_sd, y_ss), poped.db = poped.db))
+    return(list(y = y, poped.db = poped.db))
   })
 }
 ```
@@ -260,11 +259,12 @@ fg <- function(x, a, bpop, b, bocc){
 
 ## `feps()`
 
-Final, we define the residual error model structure. We’re using a
-log-normal residual error model (i.e., additive on the log scale), so we
-need to define a custom function for this as well. The setup is a bit
-esoteric, so we just start with one of the built-in functions and tweak
-as necessary. There’s only one new argument here:
+Finally, we define the residual error model structure. We’re using one
+of the built-in functions, but suppose instead we wanted a log-normal
+residual error model (i.e., additive on the log scale). We would need to
+define a custom function for this as well. The setup is a bit esoteric,
+so we would just start with one of the built-in functions and tweak as
+necessary. There’s only one new argument here:
 
   - `epsi`: A matrix of residual random effects (i.e. `EPS`s or `ERR`s).
 
@@ -294,21 +294,17 @@ we’ll break this down into pieces.
 poped_db <- create.poped.database(
   ff_fun = ff,
   fg_fun = fg,
-  #fError_fun = feps,
   fError_fun = feps.add.prop,
   bpop = c(CL = 10, V = 100, KA = 0.25, WT_CL = 0.75, WT_V = 1), 
   notfixed_bpop = c(1, 1, 1, 0, 0),
   d = c(CL = 0.08, V = 0.1, KA = 0.2), 
-  #sigma = c(0.05),
-  #notfixed_sigma = c(1),
   sigma = c(0.05, 1),
-  notfixed_sigma = c(1, 1),
   m = 1,
   groupsize = 12,
-  xt = c(5, c(rep(24, 3), 168) + 24),
-  minxt = c(0, c(rep(23, 3), 96) + 24),
-  maxxt = c(6, c(rep(24, 3), 168) + 24),
-  bUseGrouped_xt = 0,
+  xt = c(5, c(rep(24, 3), 168)),
+  minxt = c(0, c(rep(23, 3), 96)),
+  maxxt = c(6, c(rep(24, 3), 168)),
+  model_switch = c(1, rep(2, 4)),
   a = cbind(DOSE = 10, TAU = 24, WT = 32)
 )
 ```
@@ -317,46 +313,75 @@ We’ve covered the functions used in the first 3 arguments. Let’s break
 down the rest.
 
 ``` r
-  bpop = c(CL = 10, V2 = 100, Q = 1, V3 = 30, KA = 0.25), 
+  bpop = c(CL = 10, V = 100, KA = 0.25, WT_CL = 0.75, WT_V = 1), 
 ```
 
-``` r
-  notfixed_bpop = c(1, 1, 1, 1, 1),
-```
+These are our current best estimates of the fixed effect parameters
+(`THETA`s).
 
 ``` r
-  d = c(CL = 0.08, V2 = 0.1), 
+  notfixed_bpop = c(1, 1, 1, 0, 0),
 ```
 
-``` r
-  sigma = c(0.05),
-```
+For this example, we’re assuming that our weight covariate parameters
+are fixed in the model. We need to tell `PopED` they’re not not fixed
+(yes, that’s a double negative). Each element of this vector corresponds
+to an element of `bpop`. We use `1` to denote “not fixed” (estimated)
+and `0` to denote “not not fixed” (not estimated).
 
 ``` r
-  notfixed_sigma = c(1),
+  d = c(CL = 0.08, V = 0.1, KA = 0.2), 
 ```
+
+These are the diagonal elements of the IIV covariance matrix (`OMEGA`).
+`covd` could be used for off-diagonal elements, but we’re assuming those
+are all zero here.
+
+``` r
+  sigma = c(0.05, 1),
+```
+
+Diagonal elements of the residual covariance matrix.
 
 ``` r
   m = 1,
-  groupsize = 36,
+  groupsize = 12,
 ```
 
-``` r
-  xt = c(5, c(rep(24, 6), 168) + 24),
-```
+`m` is the number of groups, with `groupsize` subjects in each group. We
+could use multiple groups to define multiple arms of a study, or to
+assign different designs to different subjects.
 
 ``` r
-  minxt = c(0, c(rep(24, 6), 168) + 24 - 1),
-  maxxt = c(6, c(rep(24, 6), 168) + 24),
+  xt = c(5, c(rep(24, 3), 168)),
 ```
 
+Our initial sampling design.
+
 ``` r
-  bUseGrouped_xt = 0,
+  minxt = c(0, c(rep(23, 3), 96)),
+  maxxt = c(6, c(rep(24, 3), 168)),
 ```
+
+These define the design space for our sampling times. When optimizing,
+potential sampling times will be evaluated between these bounds.
+
+``` r
+  model_switch = c(1, rep(2, 4)),
+```
+
+The way we’ve defined our `ff()` function above, this allows us to
+signify that the first sampling time is after the first dose
+(`model_switch == 1`), and the remaining 4 samples are at steady state
+(`model_switch == 2`).
 
 ``` r
   a = cbind(DOSE = 10, TAU = 24, WT = 32)
 ```
+
+The “covariates” in our model. Note that we’re using a single body
+weight here to keep things simple, but we could [use a distribution if
+necessary](https://cran.r-project.org/web/packages/PopED/vignettes/examples.html#distribution-of-covariates).
 
 ## Test plot
 
@@ -366,31 +391,17 @@ the output a bit to show the separate responses for Day 1 and steady
 state.
 
 ``` r
-p <- plot_model_prediction(poped_db, model_num_points = 200) +
+plot_model_prediction(
+  poped_db,
+  model.names = c("Day 1", "Steady state"),
+  facet_scales = "free_x",
+  model_num_points = 200
+) +
   labs(x = "Time from dose (h)") +
   theme_bw()
-p +
-  xlim(0, 24) +
-  scale_x_continuous(
-    lim = c(0, 24),
-    breaks = seq(0, 24, by = 6)
-  ) +
-  ggtitle("Day 1")
 ```
 
-![](optimal_design_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
-
-``` r
-p +
-  scale_x_continuous(
-    lim = c(0, 168) + 24,
-    breaks = seq(0, 168, by = 24) + 24,
-    labels = seq(0, 168, by = 24)
-  ) +
-  ggtitle("Steady state")
-```
-
-![](optimal_design_files/figure-gfm/unnamed-chunk-19-2.png)<!-- -->
+![](optimal_design_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
 # Evaluate FIM
 
@@ -415,8 +426,26 @@ get_rse(FIM, poped_db)
     .   SIGMA[1,1]   SIGMA[2,2] 
     . 2.997297e+01 4.082483e+01
 
-The RSEs are looking pretty good, but let’s see if we can make any
-improvements with optimization.
+The RSEs are crazy high, which suggests that the model is not
+identifiable. A slight tweak to a single timepoint (increasing the
+number of support points) may help.
+
+``` r
+poped_db2 <- create.poped.database(
+  poped_db,
+  xt = c(5, c(23, 24, 24, 168))
+)
+FIM2 <- evaluate.fim(poped_db2) 
+get_rse(FIM2, poped_db2)
+```
+
+    .    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
+    .   15.48778  142.08530  223.35925   50.88485  418.53695  549.75962   29.68444 
+    . SIGMA[2,2] 
+    .   40.82396
+
+The RSEs are no longer in the millions, but certainly not as low as we’d
+hope for. Let’s see if we can make any improvements with optimization.
 
 # *D*-optimal design
 
@@ -441,7 +470,8 @@ summary(output)
     . ===============================================================================
     . FINAL RESULTS
     . Optimized Sampling Schedule
-    . Group 1: 0.3276     47     48     48    120
+    . Group 1: Model 1: 0.3276
+    . Group 1: Model 2:     23     24     24     96
     . 
     . OFV = 20.2291
     . 
@@ -460,7 +490,9 @@ summary(output)
     .    SIGMA[1,1]     0.05        30    30
     .    SIGMA[2,2]        1        41    41
     . 
-    . Total running time: 20.444 seconds
+    . Total running time: 15.789 seconds
+
+Better, but still not good enough.
 
 ## Adding another post dose sample at steady state
 
@@ -468,7 +500,7 @@ Add another post dose sample at steady state.
 
 We’ll create the PopED database from scratch again. This is probably
 easier than updating an old database when you change the number of
-samples because certain vectors (like `model_switch`) get calculated
+samples because certain vectors (like `grouped_xt`) are generated
 automatically if you don’t supply the argument and we don’t want to fuss
 with that.
 
@@ -476,21 +508,17 @@ with that.
 poped_db_extra_ss <- create.poped.database(
   ff_fun = ff,
   fg_fun = fg,
-  #fError_fun = feps,
   fError_fun = feps.add.prop,
   bpop = c(CL = 10, V = 100, KA = 0.25, WT_CL = 0.75, WT_V = 1), 
   notfixed_bpop = c(1, 1, 1, 0, 0),
   d = c(CL = 0.08, V = 0.1, KA = 0.2), 
-  #sigma = c(0.05),
-  #notfixed_sigma = c(1),
   sigma = c(0.05, 1),
-  notfixed_sigma = c(1, 1),
   m = 1,
   groupsize = 12,
-  xt = c(5, c(rep(24, 3), 4, 168) + 24),
-  minxt = c(0, c(rep(23, 3), 0, 96) + 24),
-  maxxt = c(6, c(rep(24, 3), 6, 168) + 24),
-  bUseGrouped_xt = 0,
+  xt = c(5, c(rep(24, 3), 4, 168)),
+  minxt = c(0, c(rep(23, 3), 0, 96)),
+  maxxt = c(6, c(rep(24, 3), 6, 168)),
+  model_switch = c(1, rep(2, 5)),
   a = cbind(DOSE = 10, TAU = 24, WT = 32)
 )
 ```
@@ -524,80 +552,40 @@ summary(output_extra_ss)
     . ===============================================================================
     . FINAL RESULTS
     . Optimized Sampling Schedule
-    . Group 1: 0.1266     30     48     48     48    120
+    . Group 1: Model 1: 0.2708
+    . Group 1: Model 2:      6     24     24     24     96
     . 
-    . OFV = 29.8095
+    . OFV = 24.9988
     . 
     . Efficiency: 
-    .   ((exp(ofv_final) / exp(ofv_init))^(1/n_parameters)) = 1.7707
+    .   ((exp(ofv_final) / exp(ofv_init))^(1/n_parameters)) = 1.7365
     . 
     . Expected relative standard error
     . (%RSE, rounded to nearest integer):
     .     Parameter   Values   RSE_0   RSE
     .       bpop[1]       10      13    10
-    .       bpop[2]      100      81    27
-    .       bpop[3]     0.25     119    32
+    .       bpop[2]      100      81    28
+    .       bpop[3]     0.25     119    33
     .        D[1,1]     0.08      47    47
-    .        D[2,2]      0.1     253   125
-    .        D[3,3]      0.2     289    93
-    .    SIGMA[1,1]     0.05      24    24
-    .    SIGMA[2,2]      0.1      41    41
+    .        D[2,2]      0.1     253   128
+    .        D[3,3]      0.2     289    97
+    .    SIGMA[1,1]     0.05      24    25
+    .    SIGMA[2,2]        1      41    41
     . 
-    . Total running time: 18.421 seconds
-
-``` r
-p <- plot_model_prediction(output_extra_ss$poped.db, model_num_points = 200) +
-  labs(x = "Time from dose (h)") +
-  theme_bw()
-p +
-  xlim(0, 24) +
-  scale_x_continuous(
-    lim = c(0, 24),
-    breaks = seq(0, 24, by = 6)
-  ) +
-  ggtitle("Day 1")
-```
-
-![](optimal_design_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
-
-``` r
-p +
-  scale_x_continuous(
-    lim = c(0, 168) + 24,
-    breaks = seq(0, 168, by = 24) + 24,
-    labels = seq(0, 168, by = 24)
-  ) +
-  ggtitle("Steady state")
-```
-
-![](optimal_design_files/figure-gfm/unnamed-chunk-25-2.png)<!-- -->
+    . Total running time: 17.652 seconds
 
 ## Adding sample after the final (steady-state) dose
 
 Add another sample after the final dose.
 
-We’ll create the PopED database from scratch again.
+This time we can just update the previous PopED database.
 
 ``` r
 poped_db_final <- create.poped.database(
-  ff_fun = ff,
-  fg_fun = fg,
-  #fError_fun = feps,
-  fError_fun = feps.add.prop,
-  bpop = c(CL = 10, V = 100, KA = 0.25, WT_CL = 0.75, WT_V = 1), 
-  notfixed_bpop = c(1, 1, 1, 0, 0),
-  d = c(CL = 0.08, V = 0.1, KA = 0.2), 
-  #sigma = c(0.05),
-  #notfixed_sigma = c(1),
-  sigma = c(0.05, 1),
-  notfixed_sigma = c(1, 1),
-  m = 1,
-  groupsize = 24,
-  xt = c(5, c(rep(24, 3), 72, 168) + 24),
-  minxt = c(0, c(rep(23, 3), 0, 168) + 24),
-  maxxt = c(6, c(rep(24, 3), 168, 168) + 24),
-  bUseGrouped_xt = 0,
-  a = cbind(DOSE = 10, TAU = 24, WT = 32)
+  poped_db_extra_ss,
+  xt = c(5, c(rep(24, 3), 72, 168)),
+  minxt = c(0, c(rep(23, 3), 0, 168)),
+  maxxt = c(6, c(rep(24, 3), 168, 168))
 )
 ```
 
@@ -607,9 +595,9 @@ get_rse(FIM_final, poped_db_final)
 ```
 
     .    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-    .   8.704923  61.341885  96.619551  35.657541 224.180291 296.937781  20.900794 
+    .   12.31062   86.75053  136.64068   50.42738  317.03881  419.93344   29.55819 
     . SIGMA[2,2] 
-    .  20.476586
+    .   28.95827
 
 ``` r
 output_final <- poped_optim(
@@ -630,7 +618,8 @@ summary(output_final)
     . ===============================================================================
     . FINAL RESULTS
     . Optimized Sampling Schedule
-    . Group 1: 0.4452     47     47     47  65.09    192
+    . Group 1: Model 1: 0.4452
+    . Group 1: Model 2:     23     23     23  41.09    168
     . 
     . OFV = 27.717
     . 
@@ -649,62 +638,47 @@ summary(output_final)
     .    SIGMA[1,1]     0.05      30    29
     .    SIGMA[2,2]        1      29    39
     . 
-    . Total running time: 21.169 seconds
-
-``` r
-p <- plot_model_prediction(output_final$poped.db, model_num_points = 200) +
-  labs(x = "Time from dose (h)") +
-  theme_bw()
-p +
-  xlim(0, 24) +
-  scale_x_continuous(
-    lim = c(0, 24),
-    breaks = seq(0, 24, by = 6)
-  ) +
-  ggtitle("Day 1")
-```
-
-![](optimal_design_files/figure-gfm/unnamed-chunk-28-1.png)<!-- -->
-
-``` r
-p +
-  scale_x_continuous(
-    lim = c(0, 168) + 24,
-    breaks = seq(0, 168, by = 24) + 24,
-    labels = seq(0, 168, by = 24)
-  ) +
-  ggtitle("Steady state")
-```
-
-![](optimal_design_files/figure-gfm/unnamed-chunk-28-2.png)<!-- -->
+    . Total running time: 19.934 seconds
 
 # Near-optimal design
 
 This optimal design serves us well, but it’s not very practical to
-request a sample at 65.09 hours (actually 41.09 hours after the final
-dose). For a dose at 8 AM, that would mean a sample at around 1 AM.
-Instead we’ll construct a similar design with more practical times and
-see how that affects our RSEs. We can do this by building a new `PopED`
-database based on the previous one.
+request a sample at 41.09 hours after the final dose. For a dose at 8
+AM, that would mean a sample at around 1 AM. Instead we’ll construct a
+similar design with more practical times and see how that affects our
+RSEs. We can do this by building a new `PopED` database based on the
+previous one.
 
 ``` r
 poped_db_practical <- create.poped.database(
   poped_db_final,
-  xt = c(0.5, rep(48, 3), 56, 192)
+  xt = c(0.5, rep(24, 3), 32, 168)
 )
 FIM_practical <- evaluate.fim(poped_db_practical) 
 get_rse(FIM_practical, poped_db_practical)
 ```
 
     .    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-    .   7.179303  13.866676  16.118835  34.420760  69.039897  52.722683  18.758434 
+    .   10.15307   19.61044   22.79548   48.67831   97.63716   74.56113   26.52843 
     . SIGMA[2,2] 
-    .  28.777469
+    .   40.69749
 
-This second-to-last sample at “56” hours is actually 32 hours after the
-final dose, based on the way we’ve set up the steady-state model. For an
-8 AM dose, this would mean a sample taken at 4 PM the following day.
-More practical, and we don’t seem to lose too much in terms of RSE.
+``` r
+plot_model_prediction(
+  poped_db_practical,
+  model.names = c("Day 1", "Steady state"),
+  facet_scales = "free_x",
+  model_num_points = 200
+) +
+  labs(x = "Time from dose (h)") +
+  theme_bw()
+```
+
+![](optimal_design_files/figure-gfm/unnamed-chunk-29-1.png)<!-- -->
+
+This second-to-last sample at 32 hours would be at 4 PM the day after an
+8 AM final dose. More practical, and we don’t seem to lose too much in
+terms of RSE.
 
 # Sampling windows
 
