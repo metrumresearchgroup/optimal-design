@@ -184,9 +184,7 @@ function (don’t worry, there are examples to get you started).
 
 ## `ff()`
 
-The structural model is defined by the `mrgsolve` model, but we need to
-wrap it in a function that `PopED` can use. `PopED` expects a function
-with the following arguments:
+`PopED` expects a function with the following arguments:
 
   - `model_switch`: A vector of values, the same size as `xt`,
     identifying which model response should be computed for the
@@ -386,9 +384,7 @@ necessary](https://cran.r-project.org/web/packages/PopED/vignettes/examples.html
 ## Test plot
 
 `PopED` includes a function to generate a quick test plot showing the
-typical response(s), along with the initial sampling times. We’ll tweak
-the output a bit to show the separate responses for Day 1 and steady
-state.
+typical response(s), along with the initial sampling times.
 
 ``` r
 plot_model_prediction(
@@ -711,52 +707,185 @@ plot_efficiency_of_windows(
 The 100 sets of simulated samples show no significant deviations from
 the RSEs for the optimal samples.
 
-```` r
-#
-## `mrgsolve`
-#
-#Here is the model in `mrgsolve`.  Note that this includes no variability yet.  The reason for this will become apparently once we start incorporating the `PopED` functions.
-#
-#```{r}
-#mod <- mread(file.path("model", "model_poped"))
-#see(mod)
-#```
-#
-### `ff()`
-#
-#The structural model is defined by the `mrgsolve` model, but we need to wrap it in a function that `PopED` can use.
-#
-#We use `mrgsim_q()` to get the simulation turned around as quickly as
-#possible, reducing overhead (and dropping features).  We use a single dose at time 0 and a steady-state dose at 24 hours.  We do this to simplify the design: anything on Day 1 will be evaluated between 0 and 24 hours; and anything past Day 1 (at steady state) will be evaluated after 24 hours.
-#
-#```{r}
-#ff <- function(model_switch, xt, parameters, poped.db){
-#  times_xt <- drop(xt)  
-#  dose_times <- c(0, 24)
-#  time <- sort(unique(c(times_xt, dose_times)))
-#  is.dose <- time %in% dose_times
-#
-#  data <- data.frame(
-#    ID = 1,
-#    time = time,
-#    amt = ifelse(is.dose, parameters[["DOSE"]] * 1000, 0), 
-#    cmt = ifelse(is.dose, 1, 0),
-#    ss = ifelse(time == 24, 1, 0),
-#    ii = ifelse(time == 24, 24, 0)
-#  )
-#
-#  data[["evid"]] <- data[["cmt"]]
-#
-#  out <- mod %>% 
-#    param(as.list(parameters)) %>% 
-#    mrgsim_q(data, recsort = 4)
-#
-#  y <- out$CP[match(times_xt, out$time)]
-#
-#  return(list(y = matrix(y, ncol = 1), poped.db = poped.db))
-#}
-#```
-````
+# A more complex example using `mrgsolve`
+
+TODO: clean up this text to match actual model/design
+
+Fakinumab is being studied in humans for the first time.
+
+## The study
+
+  - Single IV bolus doses of fakinumab: 0.1, 0.3, 1, 3, and 10 mg.
+  - 8 subjects per dose group will be on active drug.
+  - Proposed samples: 1, 4, 8, 12, 24, 48, 168 hours post dose.
+
+## The model
+
+Based on projections from animal PK data, we predict that a
+2-compartment model with nonlinear clearance from the central
+compartment will desribe the data.
+
+| VMAX | KM | V1 |  Q |  V2 |
+| ---: | -: | -: | -: | --: |
+|   10 | 10 |  8 | 10 | 100 |
+
+We include log-normal IIV on `VMAX`, `KM`, and `V1`, and a proportional
+residual error.
+
+| om\_VMAX | om\_KM | om\_V1 | sigma\_prop |
+| -------: | -----: | -----: | ----------: |
+|      0.1 |   0.05 |    0.1 |        0.05 |
+
+Here is the model in `mrgsolve`. Note that this includes no variability
+yet. The reason for this will become apparently once we start
+incorporating the `PopED` functions.
+
+``` r
+mod <- mread(file.path("model", "model_poped"))
+see(mod)
+```
+
+    . 
+    . Model file:  model_poped.cpp 
+    . [ param ]
+    . CL = 1, VMAX = 10, KM = 10, V1 = 8, Q = 10, V2 = 100
+    . 
+    . [ CMT ] CENT PERIPH
+    . 
+    . [ MAIN ]
+    . double ke = CL/V1;
+    . double k12 = Q/V1;
+    . double k21 = Q/V2;
+    . 
+    . [ ODE ]
+    . double CP = CENT/V1;
+    . 
+    . dxdt_CENT = k21*PERIPH - k12*CENT - VMAX*CP/(KM + CP) - ke*CENT;
+    . dxdt_PERIPH = k12*CENT - k21*PERIPH;
+    . 
+    . [ capture ]
+    . CP;
+
+## `ff()`
+
+The structural model is defined by the `mrgsolve` model, but we need to
+wrap it in a function that `PopED` can use.
+
+We use `mrgsim_q()` to get the simulation turned around as quickly as
+possible, reducing overhead (and dropping features).
+
+``` r
+ff <- function(model_switch, xt, parameters, poped.db){
+  times_xt <- drop(xt)  
+  dose_times <- 0
+  time <- sort(unique(c(times_xt, dose_times)))
+  is.dose <- time %in% dose_times
+
+  data <- data.frame(
+    ID = 1,
+    time = time,
+    amt = ifelse(is.dose, parameters[["DOSE"]] * 1000, 0), 
+    cmt = ifelse(is.dose, 1, 0)
+  )
+
+  data[["evid"]] <- data[["cmt"]]
+
+  out <- mod %>% 
+    param(as.list(parameters)) %>% 
+    mrgsim_q(data, recsort = 4)
+
+  y <- out$CP[match(times_xt, out$time)]
+
+  return(list(y = matrix(y, ncol = 1), poped.db = poped.db))
+}
+```
+
+## `fg()`
+
+In this example, we include IIV on `CL`, `VMAX`, `KM`, and `V1`, and
+pass through dose as a covariate.
+
+``` r
+fg <- function(x, a, bpop, b, bocc){
+  parameters = c(
+    CL    = bpop[1] * exp(b[1]),
+    VMAX  = bpop[2] * exp(b[2]),
+    KM    = bpop[3] * exp(b[3]),
+    V1    = bpop[4] * exp(b[4]),
+    Q     = bpop[5],
+    V2    = bpop[6],
+    DOSE  = a[1] * 1000
+  )
+  return(parameters) 
+}
+```
+
+## `create.poped.database()`
+
+``` r
+poped_db_mrg <- create.poped.database(
+  ff_fun = ff,
+  fg_fun = fg,
+  fError_fun = feps.add.prop,
+  bpop = c(CL = 30, VMAX = 10000, KM = 5, V1 = 50, Q = 30, V2 = 40), 
+  #notfixed_bpop = c(1, 1, 1, 0, 0),
+  d = c(CL = 0.2, VMAX = 0.1, KM = 0.05, V1 = 0.1), 
+  sigma = c(0.05, 1),
+  m = 6,
+  groupsize = 8,
+  #xt = c(c(1, 4, 8, 12, 24)/24, 2, 7, 14, 21),
+  xt = c(c(4, 12, 24)/24, 7, 14, 21),
+  minxt = 0,
+  maxxt = 21,
+  a = cbind(DOSE = c(0.1, 0.3, 1, 3, 10, 30))
+)
+```
+
+## Test plot
+
+``` r
+plot_model_prediction(
+  poped_db_mrg,
+  model_num_points = 200
+) +
+  labs(x = "Time from dose (h)") +
+  scale_y_log10(lim = c(0.1, 1e6)) +
+  theme_bw()
+```
+
+![](optimal_design_files/figure-gfm/unnamed-chunk-37-1.png)<!-- -->
+
+## Evaluate FIM
+
+``` r
+FIM_mrg <- evaluate.fim(poped_db_mrg) 
+get_rse(FIM_mrg, poped_db_mrg)
+```
+
+    .     bpop[1]     bpop[2]     bpop[3]     bpop[4]     bpop[5]     bpop[6] 
+    .    7.410586   20.978104   56.405850    6.315478   12.410432    8.512586 
+    .      D[1,1]      D[2,2]      D[3,3]      D[4,4]  SIGMA[1,1]  SIGMA[2,2] 
+    .   23.060768  120.294921 2414.422805   30.163171   13.503347   18.600235
+
+## *D*-optimal design
+
+### Starting from the original design
+
+``` r
+output_mrg <- poped_optim(
+  poped_db_mrg,
+  opt_xt = TRUE,
+  parallel = TRUE,
+  parallel_type = "multicore",
+  seed = 1
+)
+saveRDS(output_mrg, "opt4.rds")
+```
+
+``` r
+#output_mrg <- readRDS("opt4.rds")
+#summary(output_mrg)
+```
 
 # Other resources
 

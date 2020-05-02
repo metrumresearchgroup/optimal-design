@@ -1,15 +1,18 @@
-[ pkmodel ] cmt="DEPOT CENT PERI", depot=TRUE, trans = 11
-
 [ param ]
-CL=10, V2=100, Q=1, V3=30, KA = 0.25, WT= 70,
-  wt_cl = 0.75, wt_v = 1
+CL = 1, VMAX = 10, KM = 10, V1 = 8, Q = 10, V2 = 100
 
-[ main ]
-double CLi = CL * pow(WT/70, wt_cl);
-double V2i = V2 * pow(WT/70, wt_v);
-double Qi  = Q * pow(WT/70, wt_cl);
-double V3i = V3 * pow(WT/70, wt_v);
-double KAi = KA;
+[ CMT ] CENT PERIPH
 
-[ table ]
-capture CP = CENT/V2i ;
+[ MAIN ]
+double ke = CL/V1;
+double k12 = Q/V1;
+double k21 = Q/V2;
+
+[ ODE ]
+double CP = CENT/V1;
+
+dxdt_CENT = k21*PERIPH - k12*CENT - VMAX*CP/(KM + CP) - ke*CENT;
+dxdt_PERIPH = k12*CENT - k21*PERIPH;
+
+[ capture ]
+CP;
