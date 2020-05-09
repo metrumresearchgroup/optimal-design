@@ -10,7 +10,6 @@ output:
 
 TODO
 
-* mrgsolve mode: something more complex, like M-M CL
 * SSE for examples
 
 
@@ -556,8 +555,8 @@ fg <- function(x, a, bpop, b, bocc){
   parameters = c(
     CL    = bpop[1] * exp(b[1]),
     VMAX  = bpop[2] * exp(b[2]),
-    KM    = bpop[3] * exp(b[3]),
-    V1    = bpop[4] * exp(b[4]),
+    KM    = bpop[3],
+    V1    = bpop[4] * exp(b[3]),
     Q     = bpop[5],
     V2    = bpop[6],
     DOSE  = a[1] * 1000
@@ -574,15 +573,16 @@ poped_db_mrg <- create.poped.database(
   fg_fun = fg,
   fError_fun = feps.add.prop,
   bpop = c(CL = 30, VMAX = 10000, KM = 5, V1 = 50, Q = 30, V2 = 40), 
-  #notfixed_bpop = c(1, 1, 1, 0, 0),
-  d = c(CL = 0.2, VMAX = 0.1, KM = 0.05, V1 = 0.1), 
+  notfixed_bpop = c(1, 1, 1, 1, 0, 0),
+  d = c(CL = 0.2, VMAX = 0.1, V1 = 0.1), 
   sigma = c(0.05, 1),
   m = 6,
   groupsize = 8,
-  #xt = c(c(1, 4, 8, 12, 24)/24, 2, 7, 14, 21),
-  xt = c(c(4, 12, 24)/24, 7, 14, 21),
+  xt = c(c(1, 4, 8, 12, 24)/24, 2, 7, 14, 21),
+  #xt = c(c(4, 12, 24)/24, 7, 14, 21),
   minxt = 0,
   maxxt = 21,
+  bUseGrouped_xt = TRUE,
   a = cbind(DOSE = c(0.1, 0.3, 1, 3, 10, 30))
 )
 ```
@@ -594,7 +594,7 @@ plot_model_prediction(
   poped_db_mrg,
   model_num_points = 200
 ) +
-  labs(x = "Time from dose (h)") +
+  labs(x = "Time from dose (days)") +
   scale_y_log10(lim = c(0.1, 1e6)) +
   theme_bw()
 ```
@@ -622,9 +622,56 @@ saveRDS(output_mrg, "opt4.rds")
 ```
 
 ```{r}
-#output_mrg <- readRDS("opt4.rds")
-#summary(output_mrg)
+output_mrg <- readRDS("opt4.rds")
+summary(output_mrg)
 ```
+
+This took 45 minutes on 16 cores, but it's awesome.
+
+## Near-optimal design
+
+Again, this optimal design isn't entirely practical.  The samples are very precise at impractical times, and some are clumped together.  We'll attempt to make this a bit more workable without losing too much parameter precision.
+
+```{r}
+poped_db_practical_mrg <- create.poped.database(
+  poped_db_mrg,
+  xt = c(15/60/24, 3, 4, 7, 8, 11, 12, 16, 21)
+)
+FIM_practical_mrg <- evaluate.fim(poped_db_practical_mrg) 
+get_rse(FIM_practical_mrg, poped_db_practical_mrg)
+plot_model_prediction(
+  poped_db_practical_mrg,
+  model_num_points = 200
+) +
+  labs(x = "Time from dose (days)") +
+  scale_y_log10(lim = c(0.1, 1e6)) +
+  theme_bw()
+```
+
+Looks good.
+
+## Sampling windows
+
+We'll allow:
+
+* up to 30 minutes after dosing
+* 3 hours before or after other sampling times
+
+```{r windows_mrg,eval=FALSE}
+p <- plot_efficiency_of_windows(
+  poped_db_practical_mrg,
+  xt_plus  = c(15/60/24, rep(3/24, 8)),
+  xt_minus = c(15/60/24, rep(3/24, 8))
+)
+saveRDS(p, "windows_mrg.rds")
+```
+
+```{r}
+p <- readRDS("windows_mrg.rds")
+p
+```
+
+Again, the 100 sets of simulated samples show no significant deviations from the RSEs for the optimal samples, so we're golden.
 
 # Other resources
 

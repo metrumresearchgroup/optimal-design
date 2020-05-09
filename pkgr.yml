@@ -9,9 +9,10 @@ Packages:
   - metrumrg
   - rmarkdown
   - PopED
+  - rbabylon
 
 Repos:
-  - MPN: https://mpn.metworx.com/snapshots/stable/2020-03-07/
+  - MPN: https://mpn.metworx.com/snapshots/stable/2020-04-18/
 
 Customizations:
   Packages:

@@ -3,7 +3,6 @@ Optimal Design for PK/PD
 
 TODO
 
-  - mrgsolve mode: something more complex, like M-M CL
   - SSE for examples
 
 This document gives a brief background on optimal design of experiments
@@ -406,7 +405,7 @@ FIM <- evaluate.fim(poped_db)
 det(FIM)
 ```
 
-    . [1] 0.04804071
+    . [1] 0.04804063
 
 This determinant is what will be used to optimize the design, but it’s
 not particularly helpful by itself. What we really need are the
@@ -418,7 +417,7 @@ get_rse(FIM, poped_db)
 ```
 
     .      bpop[1]      bpop[2]      bpop[3]       D[1,1]       D[2,2]       D[3,3] 
-    . 2.983306e+05 3.132072e+06 4.936333e+06 5.192188e+01 4.888612e+02 6.485818e+02 
+    . 2.983332e+05 3.132099e+06 4.936376e+06 5.192188e+01 4.888612e+02 6.485818e+02 
     .   SIGMA[1,1]   SIGMA[2,2] 
     . 2.997297e+01 4.082483e+01
 
@@ -477,16 +476,16 @@ summary(output)
     . Expected relative standard error
     . (%RSE, rounded to nearest integer):
     .     Parameter   Values     RSE_0   RSE
-    .       bpop[1]       10    298331    38
-    .       bpop[2]      100   3132072   149
-    .       bpop[3]     0.25   4936333   153
+    .       bpop[1]       10    298333    38
+    .       bpop[2]      100   3132099   149
+    .       bpop[3]     0.25   4936376   153
     .        D[1,1]     0.08        52    50
     .        D[2,2]      0.1       489   204
     .        D[3,3]      0.2       649   127
     .    SIGMA[1,1]     0.05        30    30
     .    SIGMA[2,2]        1        41    41
     . 
-    . Total running time: 15.789 seconds
+    . Total running time: 9.327 seconds
 
 Better, but still not good enough.
 
@@ -548,27 +547,27 @@ summary(output_extra_ss)
     . ===============================================================================
     . FINAL RESULTS
     . Optimized Sampling Schedule
-    . Group 1: Model 1: 0.2708
-    . Group 1: Model 2:      6     24     24     24     96
+    . Group 1: Model 1:      6
+    . Group 1: Model 2: 0.9979     23     23     24     96
     . 
-    . OFV = 24.9988
+    . OFV = 24.6494
     . 
     . Efficiency: 
-    .   ((exp(ofv_final) / exp(ofv_init))^(1/n_parameters)) = 1.7365
+    .   ((exp(ofv_final) / exp(ofv_init))^(1/n_parameters)) = 1.6623
     . 
     . Expected relative standard error
     . (%RSE, rounded to nearest integer):
     .     Parameter   Values   RSE_0   RSE
-    .       bpop[1]       10      13    10
-    .       bpop[2]      100      81    28
-    .       bpop[3]     0.25     119    33
+    .       bpop[1]       10      13     9
+    .       bpop[2]      100      81    26
+    .       bpop[3]     0.25     119    35
     .        D[1,1]     0.08      47    47
-    .        D[2,2]      0.1     253   128
-    .        D[3,3]      0.2     289    97
+    .        D[2,2]      0.1     253   124
+    .        D[3,3]      0.2     289   120
     .    SIGMA[1,1]     0.05      24    25
     .    SIGMA[2,2]        1      41    41
     . 
-    . Total running time: 17.652 seconds
+    . Total running time: 12.69 seconds
 
 ## Adding sample after the final (steady-state) dose
 
@@ -614,7 +613,7 @@ summary(output_final)
     . ===============================================================================
     . FINAL RESULTS
     . Optimized Sampling Schedule
-    . Group 1: Model 1: 0.4452
+    . Group 1: Model 1: 0.4454
     . Group 1: Model 2:     23     23     23  41.09    168
     . 
     . OFV = 27.717
@@ -634,7 +633,7 @@ summary(output_final)
     .    SIGMA[1,1]     0.05      30    29
     .    SIGMA[2,2]        1      29    39
     . 
-    . Total running time: 19.934 seconds
+    . Total running time: 11.964 seconds
 
 # Near-optimal design
 
@@ -810,8 +809,8 @@ fg <- function(x, a, bpop, b, bocc){
   parameters = c(
     CL    = bpop[1] * exp(b[1]),
     VMAX  = bpop[2] * exp(b[2]),
-    KM    = bpop[3] * exp(b[3]),
-    V1    = bpop[4] * exp(b[4]),
+    KM    = bpop[3],
+    V1    = bpop[4] * exp(b[3]),
     Q     = bpop[5],
     V2    = bpop[6],
     DOSE  = a[1] * 1000
@@ -828,15 +827,16 @@ poped_db_mrg <- create.poped.database(
   fg_fun = fg,
   fError_fun = feps.add.prop,
   bpop = c(CL = 30, VMAX = 10000, KM = 5, V1 = 50, Q = 30, V2 = 40), 
-  #notfixed_bpop = c(1, 1, 1, 0, 0),
-  d = c(CL = 0.2, VMAX = 0.1, KM = 0.05, V1 = 0.1), 
+  notfixed_bpop = c(1, 1, 1, 1, 0, 0),
+  d = c(CL = 0.2, VMAX = 0.1, V1 = 0.1), 
   sigma = c(0.05, 1),
   m = 6,
   groupsize = 8,
-  #xt = c(c(1, 4, 8, 12, 24)/24, 2, 7, 14, 21),
-  xt = c(c(4, 12, 24)/24, 7, 14, 21),
+  xt = c(c(1, 4, 8, 12, 24)/24, 2, 7, 14, 21),
+  #xt = c(c(4, 12, 24)/24, 7, 14, 21),
   minxt = 0,
   maxxt = 21,
+  bUseGrouped_xt = TRUE,
   a = cbind(DOSE = c(0.1, 0.3, 1, 3, 10, 30))
 )
 ```
@@ -848,7 +848,7 @@ plot_model_prediction(
   poped_db_mrg,
   model_num_points = 200
 ) +
-  labs(x = "Time from dose (h)") +
+  labs(x = "Time from dose (days)") +
   scale_y_log10(lim = c(0.1, 1e6)) +
   theme_bw()
 ```
@@ -862,10 +862,10 @@ FIM_mrg <- evaluate.fim(poped_db_mrg)
 get_rse(FIM_mrg, poped_db_mrg)
 ```
 
-    .     bpop[1]     bpop[2]     bpop[3]     bpop[4]     bpop[5]     bpop[6] 
-    .    7.410586   20.978104   56.405850    6.315478   12.410432    8.512586 
-    .      D[1,1]      D[2,2]      D[3,3]      D[4,4]  SIGMA[1,1]  SIGMA[2,2] 
-    .   23.060768  120.294921 2414.422805   30.163171   13.503347   18.600235
+    .    bpop[1]    bpop[2]    bpop[3]    bpop[4]     D[1,1]     D[2,2]     D[3,3] 
+    .   6.948917  11.109047  46.428881   5.026730  21.889966  58.945244  24.478984 
+    . SIGMA[1,1] SIGMA[2,2] 
+    .   9.000659  18.054441
 
 ## *D*-optimal design
 
@@ -883,9 +883,104 @@ saveRDS(output_mrg, "opt4.rds")
 ```
 
 ``` r
-#output_mrg <- readRDS("opt4.rds")
-#summary(output_mrg)
+output_mrg <- readRDS("opt4.rds")
+summary(output_mrg)
 ```
+
+    . ===============================================================================
+    . FINAL RESULTS
+    . Optimized Sampling Schedule
+    . Group 1: 1.001e-05  3.443  4.272  7.286  7.656  10.71  11.99  15.86  20.14
+    . Group 2: 1.001e-05  3.443  4.272  7.286  7.656  10.71  11.99  15.86  20.14
+    . Group 3: 1.001e-05  3.443  4.272  7.286  7.656  10.71  11.99  15.86  20.14
+    . Group 4: 1.001e-05  3.443  4.272  7.286  7.656  10.71  11.99  15.86  20.14
+    . Group 5: 1.001e-05  3.443  4.272  7.286  7.656  10.71  11.99  15.86  20.14
+    . Group 6: 1.001e-05  3.443  4.272  7.286  7.656  10.71  11.99  15.86  20.14
+    . 
+    . OFV = 20.5232
+    . 
+    . Efficiency: 
+    .   ((exp(ofv_final) / exp(ofv_init))^(1/n_parameters)) = 1.8096
+    . 
+    . Expected relative standard error
+    . (%RSE, rounded to nearest integer):
+    .     Parameter   Values   RSE_0   RSE
+    .       bpop[1]       30       7     7
+    .       bpop[2]    1e+04      11     6
+    .       bpop[3]        5      46    10
+    .       bpop[4]       50       5     6
+    .        D[1,1]      0.2      22    22
+    .        D[2,2]      0.1      59    26
+    .        D[3,3]      0.1      24    29
+    .    SIGMA[1,1]     0.05       9    11
+    .    SIGMA[2,2]        1      18    14
+    . 
+    . Total running time: 2674.47 seconds
+
+This took 45 minutes on 16 cores, but it’s awesome.
+
+## Near-optimal design
+
+Again, this optimal design isn’t entirely practical. The samples are
+very precise at impractical times, and some are clumped together. We’ll
+attempt to make this a bit more workable without losing too much
+parameter precision.
+
+``` r
+poped_db_practical_mrg <- create.poped.database(
+  poped_db_mrg,
+  xt = c(15/60/24, 3, 4, 7, 8, 11, 12, 16, 21)
+)
+FIM_practical_mrg <- evaluate.fim(poped_db_practical_mrg) 
+get_rse(FIM_practical_mrg, poped_db_practical_mrg)
+```
+
+    .    bpop[1]    bpop[2]    bpop[3]    bpop[4]     D[1,1]     D[2,2]     D[3,3] 
+    .   6.755146   6.628884  12.964246   5.579549  21.832959  31.095674  29.591948 
+    . SIGMA[1,1] SIGMA[2,2] 
+    .  10.576996  13.522204
+
+``` r
+plot_model_prediction(
+  poped_db_practical_mrg,
+  model_num_points = 200
+) +
+  labs(x = "Time from dose (days)") +
+  scale_y_log10(lim = c(0.1, 1e6)) +
+  theme_bw()
+```
+
+![](optimal_design_files/figure-gfm/unnamed-chunk-40-1.png)<!-- -->
+
+Looks good.
+
+## Sampling windows
+
+We’ll allow:
+
+  - up to 30 minutes after dosing
+  - 3 hours before or after other sampling times
+
+<!-- end list -->
+
+``` r
+p <- plot_efficiency_of_windows(
+  poped_db_practical_mrg,
+  xt_plus  = c(15/60/24, rep(3/24, 8)),
+  xt_minus = c(15/60/24, rep(3/24, 8))
+)
+saveRDS(p, "windows_mrg.rds")
+```
+
+``` r
+p <- readRDS("windows_mrg.rds")
+p
+```
+
+![](optimal_design_files/figure-gfm/unnamed-chunk-41-1.png)<!-- -->
+
+Again, the 100 sets of simulated samples show no significant deviations
+from the RSEs for the optimal samples, so we’re golden.
 
 # Other resources
 
