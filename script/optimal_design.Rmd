@@ -521,28 +521,36 @@ We use `mrgsim_q()` to get the simulation turned around as quickly as
 possible, reducing overhead (and dropping features).
 
 ```{r}
-ff <- function(model_switch, xt, parameters, poped.db){
-  times_xt <- drop(xt)  
-  dose_times <- 0
-  time <- sort(unique(c(times_xt, dose_times)))
-  is.dose <- time %in% dose_times
-
-  data <- data.frame(
-    ID = 1,
-    time = time,
-    amt = ifelse(is.dose, parameters[["DOSE"]] * 1000, 0), 
-    cmt = ifelse(is.dose, 1, 0)
+ff <- function(model_switch, xt, parameters, poped.db) {
+  
+  obs_time <- as.numeric(xt)
+  dose_time <- 0
+  
+  dose <- data.frame(
+    ID = 1, 
+    amt = parameters[["DOSE"]]*1000,
+    cmt = 1, 
+    evid = 1,
+    time = dose_time
   )
+  
+  obs <- data.frame(
+    ID = 1, 
+    amt = 0, 
+    cmt = 1, 
+    evid = 0, 
+    time = obs_time
+  )
+  
+  data <- arrange(bind_rows(dose,obs),time)
+  
+  mod <- param(mod, parameters)
+  
+  out <- mrgsim_q(mod,data,recsort=4,output="matrix")
+  
+  out <- out[data$evid==0,"CP",drop=FALSE]
 
-  data[["evid"]] <- data[["cmt"]]
-
-  out <- mod %>% 
-    param(as.list(parameters)) %>% 
-    mrgsim_q(data, recsort = 4)
-
-  y <- out$CP[match(times_xt, out$time)]
-
-  return(list(y = matrix(y, ncol = 1), poped.db = poped.db))
+  return(list(y = out, poped.db = poped.db))
 }
 ```
 
