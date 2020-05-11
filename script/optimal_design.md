@@ -1,6 +1,48 @@
 Optimal Design for PK/PD
 ================
 
+  - [Optimal design background](#optimal-design-background)
+      - [Fisher information matrix](#fisher-information-matrix)
+      - [Nonlinear mixed effects
+        models](#nonlinear-mixed-effects-models)
+      - [Evaluation vs Optimization](#evaluation-vs-optimization)
+      - [Sampling windows](#sampling-windows)
+  - [Packages and setup](#packages-and-setup)
+  - [Introducing our example](#introducing-our-example)
+      - [The study](#the-study)
+      - [The model](#the-model)
+  - [The `PopED` setup](#the-poped-setup)
+      - [`ff()`](#ff)
+      - [`fg()`](#fg)
+      - [`feps()`](#feps)
+      - [`create.poped.database()`](#create.poped.database)
+      - [Test plot](#test-plot)
+  - [Evaluate FIM](#evaluate-fim)
+  - [*D*-optimal design](#d-optimal-design)
+      - [Starting from the original
+        design](#starting-from-the-original-design)
+      - [Adding another post dose sample at steady
+        state](#adding-another-post-dose-sample-at-steady-state)
+      - [Adding sample after the final (steady-state)
+        dose](#adding-sample-after-the-final-steady-state-dose)
+  - [Near-optimal design](#near-optimal-design)
+  - [Sampling windows](#sampling-windows-1)
+  - [A more complex example using
+    `mrgsolve`](#a-more-complex-example-using-mrgsolve)
+      - [The study](#the-study-1)
+      - [The model](#the-model-1)
+      - [`ff()`](#ff-1)
+      - [`fg()`](#fg-1)
+      - [`create.poped.database()`](#create.poped.database-1)
+      - [Test plot](#test-plot-1)
+      - [Evaluate FIM](#evaluate-fim-1)
+      - [*D*-optimal design](#d-optimal-design-1)
+          - [Starting from the original
+            design](#starting-from-the-original-design-1)
+      - [Near-optimal design](#near-optimal-design-1)
+      - [Sampling windows](#sampling-windows-2)
+  - [Other resources](#other-resources)
+
 TODO
 
   - SSE for examples
@@ -43,7 +85,7 @@ which loosely translates to maximizing the overall precision of
 parameter estimates.
 
 The FIM is typically notated by something like *M*<sub>*F*</sub>(Φ,Ξ),
-where Φ is the vector of parameter values (e.g. *CL*, ω<sub>*CL*</sub>,
+where Φ is the vector of parameter values (e.g. *CL*, ω<sub>*CL*</sub>,
 etc.) and Ξ is the vector of design variables (e.g. dose levels, PK
 sampling times, etc.). For linear models, the dependence on the
 parameters disappears. Unfortunately for us, this is not the case for
@@ -263,7 +305,7 @@ define a custom function for this as well. The setup is a bit esoteric,
 so we would just start with one of the built-in functions and tweak as
 necessary. There’s only one new argument here:
 
-  - `epsi`: A matrix of residual random effects (i.e. `EPS`s or `ERR`s).
+  - `epsi`: A matrix of residual random effects (i.e. `EPS`s or `ERR`s).
 
 <!-- end list -->
 
@@ -405,7 +447,7 @@ FIM <- evaluate.fim(poped_db)
 det(FIM)
 ```
 
-    . [1] 0.04804063
+    . [1] 0.04804071
 
 This determinant is what will be used to optimize the design, but it’s
 not particularly helpful by itself. What we really need are the
@@ -417,7 +459,7 @@ get_rse(FIM, poped_db)
 ```
 
     .      bpop[1]      bpop[2]      bpop[3]       D[1,1]       D[2,2]       D[3,3] 
-    . 2.983332e+05 3.132099e+06 4.936376e+06 5.192188e+01 4.888612e+02 6.485818e+02 
+    . 2.983306e+05 3.132072e+06 4.936333e+06 5.192188e+01 4.888612e+02 6.485818e+02 
     .   SIGMA[1,1]   SIGMA[2,2] 
     . 2.997297e+01 4.082483e+01
 
@@ -749,21 +791,21 @@ see(mod)
     . [ param ]
     . CL = 1, VMAX = 10, KM = 10, V1 = 8, Q = 10, V2 = 100
     . 
-    . [ CMT ] CENT PERIPH
+    . [ cmt ] CENT PERIPH
     . 
-    . [ MAIN ]
-    . double ke = CL/V1;
+    . [ main ]
+    . double ke  = CL/V1;
     . double k12 = Q/V1;
     . double k21 = Q/V2;
     . 
-    . [ ODE ]
+    . [ ode ]
     . double CP = CENT/V1;
     . 
     . dxdt_CENT = k21*PERIPH - k12*CENT - VMAX*CP/(KM + CP) - ke*CENT;
     . dxdt_PERIPH = k12*CENT - k21*PERIPH;
     . 
     . [ capture ]
-    . CP;
+    . CP
 
 ## `ff()`
 
@@ -774,28 +816,36 @@ We use `mrgsim_q()` to get the simulation turned around as quickly as
 possible, reducing overhead (and dropping features).
 
 ``` r
-ff <- function(model_switch, xt, parameters, poped.db){
-  times_xt <- drop(xt)  
-  dose_times <- 0
-  time <- sort(unique(c(times_xt, dose_times)))
-  is.dose <- time %in% dose_times
-
-  data <- data.frame(
-    ID = 1,
-    time = time,
-    amt = ifelse(is.dose, parameters[["DOSE"]] * 1000, 0), 
-    cmt = ifelse(is.dose, 1, 0)
+ff <- function(model_switch, xt, parameters, poped.db) {
+  
+  obs_time <- as.numeric(xt)
+  dose_time <- 0
+  
+  dose <- data.frame(
+    ID = 1, 
+    amt = parameters[["DOSE"]]*1000,
+    cmt = 1, 
+    evid = 1,
+    time = dose_time
   )
-
-  data[["evid"]] <- data[["cmt"]]
-
-  out <- mod %>% 
-    param(as.list(parameters)) %>% 
-    mrgsim_q(data, recsort = 4)
-
-  y <- out$CP[match(times_xt, out$time)]
-
-  return(list(y = matrix(y, ncol = 1), poped.db = poped.db))
+  
+  obs <- data.frame(
+    ID = 1, 
+    amt = 0, 
+    cmt = 1, 
+    evid = 0, 
+    time = sort(obs_time)
+  )
+  
+  data <- arrange(bind_rows(dose,obs),time)
+  
+  mod <- param(mod, parameters)
+  
+  out <- mrgsim_q(mod,data,output="matrix")
+  
+  out <- out[data$evid==0,"CP",drop=FALSE][match(obs_time,obs$time),]
+  
+  return(list(y = out, poped.db = poped.db))
 }
 ```
 
@@ -863,7 +913,7 @@ get_rse(FIM_mrg, poped_db_mrg)
 ```
 
     .    bpop[1]    bpop[2]    bpop[3]    bpop[4]     D[1,1]     D[2,2]     D[3,3] 
-    .   6.948917  11.109047  46.428881   5.026730  21.889966  58.945244  24.478984 
+    .   6.948917  11.109047  46.428777   5.026730  21.889966  58.945345  24.478983 
     . SIGMA[1,1] SIGMA[2,2] 
     .   9.000659  18.054441
 
@@ -936,7 +986,7 @@ get_rse(FIM_practical_mrg, poped_db_practical_mrg)
 ```
 
     .    bpop[1]    bpop[2]    bpop[3]    bpop[4]     D[1,1]     D[2,2]     D[3,3] 
-    .   6.755146   6.628884  12.964246   5.579549  21.832959  31.095674  29.591948 
+    .   6.755146   6.628884  12.964245   5.579549  21.832959  31.095674  29.591948 
     . SIGMA[1,1] SIGMA[2,2] 
     .  10.576996  13.522204
 
