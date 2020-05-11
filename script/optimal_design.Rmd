@@ -539,17 +539,17 @@ ff <- function(model_switch, xt, parameters, poped.db) {
     amt = 0, 
     cmt = 1, 
     evid = 0, 
-    time = obs_time
+    time = sort(obs_time)
   )
   
   data <- arrange(bind_rows(dose,obs),time)
   
   mod <- param(mod, parameters)
   
-  out <- mrgsim_q(mod,data,recsort=4,output="matrix")
+  out <- mrgsim_q(mod,data,output="matrix")
   
-  out <- out[data$evid==0,"CP",drop=FALSE]
-
+  out <- out[data$evid==0,"CP",drop=FALSE][match(obs_time,obs$time),]
+  
   return(list(y = out, poped.db = poped.db))
 }
 ```

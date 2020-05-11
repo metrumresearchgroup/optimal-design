@@ -791,21 +791,21 @@ see(mod)
     . [ param ]
     . CL = 1, VMAX = 10, KM = 10, V1 = 8, Q = 10, V2 = 100
     . 
-    . [ CMT ] CENT PERIPH
+    . [ cmt ] CENT PERIPH
     . 
-    . [ MAIN ]
-    . double ke = CL/V1;
+    . [ main ]
+    . double ke  = CL/V1;
     . double k12 = Q/V1;
     . double k21 = Q/V2;
     . 
-    . [ ODE ]
+    . [ ode ]
     . double CP = CENT/V1;
     . 
     . dxdt_CENT = k21*PERIPH - k12*CENT - VMAX*CP/(KM + CP) - ke*CENT;
     . dxdt_PERIPH = k12*CENT - k21*PERIPH;
     . 
     . [ capture ]
-    . CP;
+    . CP
 
 ## `ff()`
 
@@ -834,17 +834,17 @@ ff <- function(model_switch, xt, parameters, poped.db) {
     amt = 0, 
     cmt = 1, 
     evid = 0, 
-    time = obs_time
+    time = sort(obs_time)
   )
   
   data <- arrange(bind_rows(dose,obs),time)
   
   mod <- param(mod, parameters)
   
-  out <- mrgsim_q(mod,data,recsort=4,output="matrix")
+  out <- mrgsim_q(mod,data,output="matrix")
   
-  out <- out[data$evid==0,"CP",drop=FALSE]
-
+  out <- out[data$evid==0,"CP",drop=FALSE][match(obs_time,obs$time),]
+  
   return(list(y = out, poped.db = poped.db))
 }
 ```
