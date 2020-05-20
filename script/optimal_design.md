@@ -1,48 +1,6 @@
 Optimal Design for PK/PD
 ================
 
-  - [Optimal design background](#optimal-design-background)
-      - [Fisher information matrix](#fisher-information-matrix)
-      - [Nonlinear mixed effects
-        models](#nonlinear-mixed-effects-models)
-      - [Evaluation vs Optimization](#evaluation-vs-optimization)
-      - [Sampling windows](#sampling-windows)
-  - [Packages and setup](#packages-and-setup)
-  - [Introducing our example](#introducing-our-example)
-      - [The study](#the-study)
-      - [The model](#the-model)
-  - [The `PopED` setup](#the-poped-setup)
-      - [`ff()`](#ff)
-      - [`fg()`](#fg)
-      - [`feps()`](#feps)
-      - [`create.poped.database()`](#create.poped.database)
-      - [Test plot](#test-plot)
-  - [Evaluate FIM](#evaluate-fim)
-  - [*D*-optimal design](#d-optimal-design)
-      - [Starting from the original
-        design](#starting-from-the-original-design)
-      - [Adding another post dose sample at steady
-        state](#adding-another-post-dose-sample-at-steady-state)
-      - [Adding sample after the final (steady-state)
-        dose](#adding-sample-after-the-final-steady-state-dose)
-  - [Near-optimal design](#near-optimal-design)
-  - [Sampling windows](#sampling-windows-1)
-  - [A more complex example using
-    `mrgsolve`](#a-more-complex-example-using-mrgsolve)
-      - [The study](#the-study-1)
-      - [The model](#the-model-1)
-      - [`ff()`](#ff-1)
-      - [`fg()`](#fg-1)
-      - [`create.poped.database()`](#create.poped.database-1)
-      - [Test plot](#test-plot-1)
-      - [Evaluate FIM](#evaluate-fim-1)
-      - [*D*-optimal design](#d-optimal-design-1)
-          - [Starting from the original
-            design](#starting-from-the-original-design-1)
-      - [Near-optimal design](#near-optimal-design-1)
-      - [Sampling windows](#sampling-windows-2)
-  - [Other resources](#other-resources)
-
 TODO
 
   - SSE for examples
@@ -85,7 +43,7 @@ which loosely translates to maximizing the overall precision of
 parameter estimates.
 
 The FIM is typically notated by something like *M*<sub>*F*</sub>(Φ,Ξ),
-where Φ is the vector of parameter values (e.g. *CL*, ω<sub>*CL*</sub>,
+where Φ is the vector of parameter values (e.g. *CL*, ω<sub>*CL*</sub>,
 etc.) and Ξ is the vector of design variables (e.g. dose levels, PK
 sampling times, etc.). For linear models, the dependence on the
 parameters disappears. Unfortunately for us, this is not the case for
@@ -158,6 +116,8 @@ requireNamespace("metrumrg")
 library(tidyverse)
 library(mrgsolve)
 library(PopED)
+library(rbabylon) 
+theme_set(theme_bw())
 ```
 
 # Introducing our example
@@ -305,7 +265,7 @@ define a custom function for this as well. The setup is a bit esoteric,
 so we would just start with one of the built-in functions and tweak as
 necessary. There’s only one new argument here:
 
-  - `epsi`: A matrix of residual random effects (i.e. `EPS`s or `ERR`s).
+  - `epsi`: A matrix of residual random effects (i.e. `EPS`s or `ERR`s).
 
 <!-- end list -->
 
@@ -434,8 +394,7 @@ plot_model_prediction(
   facet_scales = "free_x",
   model_num_points = 200
 ) +
-  labs(x = "Time from dose (h)") +
-  theme_bw()
+  labs(x = "Time from dose (h)")
 ```
 
 ![](optimal_design_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
@@ -447,7 +406,7 @@ FIM <- evaluate.fim(poped_db)
 det(FIM)
 ```
 
-    . [1] 0.04804071
+    . [1] 0.04804063
 
 This determinant is what will be used to optimize the design, but it’s
 not particularly helpful by itself. What we really need are the
@@ -459,7 +418,7 @@ get_rse(FIM, poped_db)
 ```
 
     .      bpop[1]      bpop[2]      bpop[3]       D[1,1]       D[2,2]       D[3,3] 
-    . 2.983306e+05 3.132072e+06 4.936333e+06 5.192188e+01 4.888612e+02 6.485818e+02 
+    . 2.983332e+05 3.132099e+06 4.936376e+06 5.192188e+01 4.888612e+02 6.485818e+02 
     .   SIGMA[1,1]   SIGMA[2,2] 
     . 2.997297e+01 4.082483e+01
 
@@ -707,8 +666,7 @@ plot_model_prediction(
   facet_scales = "free_x",
   model_num_points = 200
 ) +
-  labs(x = "Time from dose (h)") +
-  theme_bw()
+  labs(x = "Time from dose (h)")
 ```
 
 ![](optimal_design_files/figure-gfm/unnamed-chunk-29-1.png)<!-- -->
@@ -747,6 +705,260 @@ plot_efficiency_of_windows(
 
 The 100 sets of simulated samples show no significant deviations from
 the RSEs for the optimal samples.
+
+# Stochastic Simulation and Estimation
+
+``` r
+n_sub <- 12
+n_rep <- 100
+ctl_template <- readLines(file.path("nonmem", "template_ex1.ctl"))
+true_vals <- tibble(
+  THETA1 = 10, THETA2 = 100, THETA3 = 0.25,
+  `SIGMA(1,1)` = 0.05, `SIGMA(2,2)` = 1,
+  `OMEGA(1,1)` = 0.08, `OMEGA(2,2)` = 0.1, `OMEGA(3,3)` = 0.2
+) %>% 
+  gather("param", "value")
+```
+
+We’ll need some functions to write out datasets and control streams for
+each replicate.
+
+This first function writes out a CSV dataset with dosing and (to be
+simulated) observations events for a single
+replicate.
+
+``` r
+write_data <- function(.design_dir, .run_num, .times = NULL, .times_lo = NULL, .times_hi = NULL) {
+  set.seed(.run_num)
+  if (is.null(.times_lo)) {
+    pk <- tibble(
+      TIME = .times,
+      AMT = 0,
+      CMT = 2,
+      EVID = 0,
+      SS = 0,
+      II = 0
+    ) %>% 
+      expand_grid(ID = seq_len(n_sub))
+  } else {
+    pk <- tibble(
+      t_lo = .times_lo,
+      t_hi = .times_hi,
+      AMT = 0,
+      CMT = 2,
+      EVID = 0,
+      SS = 0,
+      II = 0
+    ) %>% 
+      expand_grid(ID = seq_len(n_sub)) %>% 
+      mutate(TIME = runif(n(), t_lo, t_hi))
+  }
+  data <- bind_rows(
+    tibble(
+      TIME = c(0, 24),
+      AMT = 10 * 1000,
+      CMT = 1,
+      SS = c(0, 1),
+      II = c(0, 24),
+      EVID = 1
+    ) %>%
+      expand_grid(
+        ID = seq_len(n_sub)
+      ),
+    pk
+  ) %>% 
+    arrange(ID, TIME, desc(EVID)) %>% 
+    mutate(DV = NA, MDV = if_else(EVID == 1, 1, 0), WT = 32) %>% 
+    select(ID, TIME, EVID, MDV, CMT, AMT, SS, II, DV, WT)
+  write_csv(data, file.path(.design_dir, paste0(.run_num, ".csv")), na = ".")
+}
+```
+
+The next function performs 2 steps for each replicate: (1) take the
+template control stream and adjusts it to point to the relevant dataset
+and set the random seed; and (2) runs the model using `rbabylon`.
+
+``` r
+run_model <- function(.design_dir, .run_num) {
+  # Modify and write the control stream
+  ctl_template %>% 
+    str_replace("run_num", as.character(.run_num)) %>% 
+    str_replace("data_fname", paste0("../", .run_num, ".csv")) %>% 
+    writeLines(file.path(.design_dir, paste0(.run_num, ".ctl")))
+  
+  # Run the model
+  new_model(
+    .yaml_path = file.path(.design_dir, paste0(.run_num, ".yaml")),
+    .description = .run_num
+  ) %>%
+    submit_model()
+}
+```
+
+``` r
+get_est <- function(.design_dir) {
+  est <- map_dfr(seq_len(n_rep), function(.run_num) {
+    mod <- read_model(file.path(.design_dir, paste0(.run_num, ".yaml")))
+    mod_sum <- try(mod %>% model_summary(), silent = TRUE)
+    if (inherits(mod_sum, "try-error")) return(NULL)
+    #if (mod_sum$run_heuristics$minimization_terminated) return(NULL)
+    mod_sum %>% 
+      param_estimates() %>% 
+      filter(fixed == 0) %>% 
+      select(param = names, estimate) %>% 
+      mutate(rep = .run_num)
+  }) %>% 
+    left_join(true_vals) %>% 
+    mutate(
+      param = factor(param, levels = unique(.[["param"]])),
+      pct_bias = (estimate - value) / abs(value) * 100
+    ) %>% 
+    filter(abs(pct_bias) < 5000)
+  return(est)
+}
+
+plot_est <- function(.est) {
+  .est %>% 
+    mutate(type = substr(param, 1, 5)) %>% 
+    ggplot(aes(param, pct_bias, fill = type)) +
+    geom_boxplot() +
+    #geom_violin() +
+    labs(x = NULL, y = "Relative Bias (%)") +
+    theme(legend.position = "none")
+}
+
+sum_est <- function(.est) {
+  output <- .est %>% 
+    group_by(param) %>% 
+    summarise(
+      sim_pct_rse = sd(estimate) / abs(first(value)) * 100,
+      sim_pct_bias = mean(pct_bias)
+    )
+  n_success <- n_distinct(.est$rep)
+  #message(glue::glue("{n_success} out of {n_rep} runs successful."))
+  
+  return(output)
+}
+```
+
+Set up `rbabylon`.
+
+``` r
+# setup bbi path
+# you must have a working installation of babylon at `/data/apps/bbi` for this to work. 
+# If you have one somewhere else, just change the path here. If not, please download from https://github.com/metrumresearchgroup/babylon/releases
+options('rbabylon.bbi_exe_path' = '/data/apps/bbi')
+```
+
+## Design 1: proposed sampling.
+
+``` r
+design_dir <- file.path("nonmem", "ex1_design1")
+# create babylon.yaml in model directory
+bbi_init(
+  .dir = design_dir,           # your modeling directory
+  .nonmem_dir = "/opt/NONMEM", # directory where NONMEM is installed
+  .nonmem_version = "nm74gf"   # default version of NONMEM to use
+)
+
+set.seed(1)
+# add 24 hours to SS samples, since we're including a SS dose at 24 hours
+times <- c(5, c(rep(24, 3), 168) + 24)
+```
+
+``` r
+walk(seq_len(n_rep), function(run_num) {
+  write_data(design_dir, run_num, .times = times)
+  run_model(design_dir, run_num)
+})
+```
+
+``` r
+est <- get_est(design_dir)
+saveRDS(est, "ex1_est1.rds")
+```
+
+``` r
+est <- readRDS("ex1_est1.rds")
+plot_est(est) + scale_y_continuous(limits =  c(-110, 500))
+```
+
+![](optimal_design_files/figure-gfm/unnamed-chunk-39-1.png)<!-- -->
+
+``` r
+sum_est(est) %>% 
+  mutate(poped_pct_rse = get_rse(evaluate.fim(poped_db2), poped_db2)) %>% 
+  select(param, poped_pct_rse, everything())
+```
+
+    . # A tibble: 8 x 4
+    .   param      poped_pct_rse sim_pct_rse sim_pct_bias
+    .   <fct>              <dbl>       <dbl>        <dbl>
+    . 1 THETA1              15.5        12.3        4.29 
+    . 2 THETA2             142.         36.4       -0.751
+    . 3 THETA3             223.        313.        47.4  
+    . 4 OMEGA(1,1)          50.9        74.2       35.1  
+    . 5 OMEGA(2,2)         419.        192.        66.7  
+    . 6 OMEGA(3,3)         550.        388.        68.9  
+    . 7 SIGMA(1,1)          29.7        34.2       -2.42 
+    . 8 SIGMA(2,2)          40.8        40.6        3.87
+
+## Design 2: Near-optimal design with windows
+
+``` r
+design_dir <- file.path("nonmem", "ex1_design2")
+# create babylon.yaml in model directory
+bbi_init(
+  .dir = design_dir,           # your modeling directory
+  .nonmem_dir = "/opt/NONMEM", # directory where NONMEM is installed
+  .nonmem_version = "nm74gf"   # default version of NONMEM to use
+)
+
+set.seed(1)
+# add 24 hours to SS samples, since we're including a SS dose at 24 hours
+times <- c(0.5, c(rep(24, 3), 32, 168) + 24)
+t_lo <- times - c(0.25, rep(0, 3), 2, 0)
+t_hi <- times + c(0.25, rep(1, 3), 2, 4)
+```
+
+``` r
+walk(seq_len(n_rep), function(run_num) {
+  write_data(design_dir, run_num, .times = times,
+             .times_lo = t_lo, .times_hi = t_hi)
+  run_model(design_dir, run_num)
+})
+```
+
+``` r
+est <- get_est(design_dir)
+saveRDS(est, "ex1_est2.rds")
+```
+
+``` r
+est <- readRDS("ex1_est2.rds")
+plot_est(est)
+```
+
+![](optimal_design_files/figure-gfm/unnamed-chunk-44-1.png)<!-- -->
+
+``` r
+sum_est(est) %>% 
+  mutate(poped_pct_rse = get_rse(evaluate.fim(poped_db_practical),
+                                 poped_db_practical)) %>% 
+  select(param, poped_pct_rse, everything())
+```
+
+    . # A tibble: 8 x 4
+    .   param      poped_pct_rse sim_pct_rse sim_pct_bias
+    .   <fct>              <dbl>       <dbl>        <dbl>
+    . 1 THETA1              10.2        12.2        4.21 
+    . 2 THETA2              19.6        29.0        6.74 
+    . 3 THETA3              22.8        32.0        0.393
+    . 4 OMEGA(1,1)          48.7        74.2       41.7  
+    . 5 OMEGA(2,2)          97.6       133.        25.9  
+    . 6 OMEGA(3,3)          74.6        90.0        7.24 
+    . 7 SIGMA(1,1)          26.5        28.6       -6.69 
+    . 8 SIGMA(2,2)          40.7        41.3       11.9
 
 # A more complex example using `mrgsolve`
 
@@ -863,7 +1075,7 @@ fg <- function(x, a, bpop, b, bocc){
     V1    = bpop[4] * exp(b[3]),
     Q     = bpop[5],
     V2    = bpop[6],
-    DOSE  = a[1] * 1000
+    DOSE  = a[1] 
   )
   return(parameters) 
 }
@@ -875,19 +1087,19 @@ fg <- function(x, a, bpop, b, bocc){
 poped_db_mrg <- create.poped.database(
   ff_fun = ff,
   fg_fun = fg,
-  fError_fun = feps.add.prop,
-  bpop = c(CL = 30, VMAX = 10000, KM = 5, V1 = 50, Q = 30, V2 = 40), 
-  notfixed_bpop = c(1, 1, 1, 1, 0, 0),
-  d = c(CL = 0.2, VMAX = 0.1, V1 = 0.1), 
-  sigma = c(0.05, 1),
+  fError_fun = feps.prop,
+  bpop = c(CL = 0.5, VMAX = 20, KM = 1.2, V1 = 2.5, Q = 10, V2 = 4), 
+  notfixed_bpop = c(1, 1, 1, 1, 1, 1),
+  d = c(CL = 0.2, VMAX = 0.2, V1 = 0.1),
+  sigma = c(0.15),
   m = 6,
-  groupsize = 8,
-  xt = c(c(1, 4, 8, 12, 24)/24, 2, 7, 14, 21),
-  #xt = c(c(4, 12, 24)/24, 7, 14, 21),
+  groupsize = 6,
+  xt = c(c(1, 4)/24, 1, 3, 7, 14, 21),
   minxt = 0,
   maxxt = 21,
+  #discrete_xt = list(c((1:4)/24, 1:21)),
   bUseGrouped_xt = TRUE,
-  a = cbind(DOSE = c(0.1, 0.3, 1, 3, 10, 30))
+  a = cbind(DOSE = c(0.03, 0.1, 0.3, 1, 3, 10))
 )
 ```
 
@@ -899,11 +1111,10 @@ plot_model_prediction(
   model_num_points = 200
 ) +
   labs(x = "Time from dose (days)") +
-  scale_y_log10(lim = c(0.1, 1e6)) +
-  theme_bw()
+  scale_y_log10(lim = c(0.01, 1e4))
 ```
 
-![](optimal_design_files/figure-gfm/unnamed-chunk-37-1.png)<!-- -->
+![](optimal_design_files/figure-gfm/unnamed-chunk-52-1.png)<!-- -->
 
 ## Evaluate FIM
 
@@ -912,112 +1123,27 @@ FIM_mrg <- evaluate.fim(poped_db_mrg)
 get_rse(FIM_mrg, poped_db_mrg)
 ```
 
-    .    bpop[1]    bpop[2]    bpop[3]    bpop[4]     D[1,1]     D[2,2]     D[3,3] 
-    .   6.948917  11.109047  46.428777   5.026730  21.889966  58.945345  24.478983 
-    . SIGMA[1,1] SIGMA[2,2] 
-    .   9.000659  18.054441
+    .    bpop[1]    bpop[2]    bpop[3]    bpop[4]    bpop[5]    bpop[6]     D[1,1] 
+    .  10.874298  10.660146   7.935583   6.355286   8.894680   3.620177  38.989274 
+    .     D[2,2]     D[3,3] SIGMA[1,1] 
+    .  32.096499  31.667628  10.775830
 
-## *D*-optimal design
-
-### Starting from the original design
-
-``` r
-output_mrg <- poped_optim(
-  poped_db_mrg,
-  opt_xt = TRUE,
-  parallel = TRUE,
-  parallel_type = "multicore",
-  seed = 1
-)
-saveRDS(output_mrg, "opt4.rds")
-```
-
-``` r
-output_mrg <- readRDS("opt4.rds")
-summary(output_mrg)
-```
-
-    . ===============================================================================
-    . FINAL RESULTS
-    . Optimized Sampling Schedule
-    . Group 1: 1.001e-05  3.443  4.272  7.286  7.656  10.71  11.99  15.86  20.14
-    . Group 2: 1.001e-05  3.443  4.272  7.286  7.656  10.71  11.99  15.86  20.14
-    . Group 3: 1.001e-05  3.443  4.272  7.286  7.656  10.71  11.99  15.86  20.14
-    . Group 4: 1.001e-05  3.443  4.272  7.286  7.656  10.71  11.99  15.86  20.14
-    . Group 5: 1.001e-05  3.443  4.272  7.286  7.656  10.71  11.99  15.86  20.14
-    . Group 6: 1.001e-05  3.443  4.272  7.286  7.656  10.71  11.99  15.86  20.14
-    . 
-    . OFV = 20.5232
-    . 
-    . Efficiency: 
-    .   ((exp(ofv_final) / exp(ofv_init))^(1/n_parameters)) = 1.8096
-    . 
-    . Expected relative standard error
-    . (%RSE, rounded to nearest integer):
-    .     Parameter   Values   RSE_0   RSE
-    .       bpop[1]       30       7     7
-    .       bpop[2]    1e+04      11     6
-    .       bpop[3]        5      46    10
-    .       bpop[4]       50       5     6
-    .        D[1,1]      0.2      22    22
-    .        D[2,2]      0.1      59    26
-    .        D[3,3]      0.1      24    29
-    .    SIGMA[1,1]     0.05       9    11
-    .    SIGMA[2,2]        1      18    14
-    . 
-    . Total running time: 2674.47 seconds
-
-This took 45 minutes on 16 cores, but it’s awesome.
-
-## Near-optimal design
-
-Again, this optimal design isn’t entirely practical. The samples are
-very precise at impractical times, and some are clumped together. We’ll
-attempt to make this a bit more workable without losing too much
-parameter precision.
-
-``` r
-poped_db_practical_mrg <- create.poped.database(
-  poped_db_mrg,
-  xt = c(15/60/24, 3, 4, 7, 8, 11, 12, 16, 21)
-)
-FIM_practical_mrg <- evaluate.fim(poped_db_practical_mrg) 
-get_rse(FIM_practical_mrg, poped_db_practical_mrg)
-```
-
-    .    bpop[1]    bpop[2]    bpop[3]    bpop[4]     D[1,1]     D[2,2]     D[3,3] 
-    .   6.755146   6.628884  12.964245   5.579549  21.832959  31.095674  29.591948 
-    . SIGMA[1,1] SIGMA[2,2] 
-    .  10.576996  13.522204
-
-``` r
-plot_model_prediction(
-  poped_db_practical_mrg,
-  model_num_points = 200
-) +
-  labs(x = "Time from dose (days)") +
-  scale_y_log10(lim = c(0.1, 1e6)) +
-  theme_bw()
-```
-
-![](optimal_design_files/figure-gfm/unnamed-chunk-40-1.png)<!-- -->
-
-Looks good.
+The RSEs look good.
 
 ## Sampling windows
 
 We’ll allow:
 
-  - up to 30 minutes after dosing
+  - 1 hour before or after samples on Day 1
   - 3 hours before or after other sampling times
 
 <!-- end list -->
 
 ``` r
 p <- plot_efficiency_of_windows(
-  poped_db_practical_mrg,
-  xt_plus  = c(15/60/24, rep(3/24, 8)),
-  xt_minus = c(15/60/24, rep(3/24, 8))
+  poped_db_mrg,
+  xt_plus  = c(rep(1/24, 2), rep(3/24, 5)),
+  xt_minus = c(rep(1/24, 2), rep(3/24, 5))
 )
 saveRDS(p, "windows_mrg.rds")
 ```
@@ -1027,10 +1153,128 @@ p <- readRDS("windows_mrg.rds")
 p
 ```
 
-![](optimal_design_files/figure-gfm/unnamed-chunk-41-1.png)<!-- -->
+![](optimal_design_files/figure-gfm/unnamed-chunk-54-1.png)<!-- -->
 
 Again, the 100 sets of simulated samples show no significant deviations
-from the RSEs for the optimal samples, so we’re golden.
+from the RSEs for the original samples, so we’re golden.
+
+## Stochastic Simulation and Estimation
+
+``` r
+n_sub_per_grp <- 6
+doses <- c(0.03, 0.1, 0.3, 1, 3, 10)
+n_doses <- length(doses)
+n_sub <- n_sub_per_grp * n_doses
+n_rep <- 100
+ctl_template <- readLines(file.path("nonmem", "template_ex2.ctl"))
+true_vals <- tibble(
+  THETA1 = 0.5, THETA2 = 20, THETA3 = 1.2,
+  THETA4 = 2.5, THETA5 = 10, THETA6 = 4,
+  `SIGMA(1,1)` = 0.15,
+  `OMEGA(1,1)` = 0.2, `OMEGA(2,2)` = 0.2, `OMEGA(4,4)` = 0.1
+  #`OMEGA(5,5)` = 0.1, `OMEGA(6,6)` = 0.1
+) %>% 
+  gather("param", "value")
+```
+
+We’ll need to rewrite the function for writing the datasets for this
+example.
+
+``` r
+write_data <- function(.design_dir, .run_num, .times = NULL, .times_lo = NULL, .times_hi = NULL) {
+  set.seed(.run_num)
+  if (is.null(.times_lo)) {
+    pk <- tibble(
+      TIME = .times,
+      AMT = 0,
+      CMT = 1,
+      EVID = 0,
+    ) %>% 
+      expand_grid(ID = seq_len(n_sub))
+  } else {
+    pk <- tibble(
+      t_lo = .times_lo,
+      t_hi = .times_hi,
+      AMT = 0,
+      CMT = 1,
+      EVID = 0,
+    ) %>% 
+      expand_grid(ID = seq_len(n_sub)) %>% 
+      mutate(TIME = runif(n(), t_lo, t_hi))
+  }
+  data <- bind_rows(
+    tibble(
+      TIME = 0,
+      AMT = doses * 1000,
+      CMT = 1,
+      EVID = 1
+    ) %>%
+      slice(rep(seq_len(n()), each = n_sub_per_grp)) %>% 
+      mutate(ID = row_number()),
+    pk
+  ) %>% 
+    arrange(ID, TIME, desc(EVID)) %>% 
+    mutate(DV = NA, MDV = if_else(EVID == 1, 1, 0)) %>% 
+    select(ID, TIME, EVID, MDV, CMT, AMT, DV)
+  write_csv(data, file.path(.design_dir, paste0(.run_num, ".csv")), na = ".")
+}
+```
+
+``` r
+design_dir <- file.path("nonmem", "ex2_design1")
+# create babylon.yaml in model directory
+bbi_init(
+  .dir = design_dir,           # your modeling directory
+  .nonmem_dir = "/opt/NONMEM", # directory where NONMEM is installed
+  .nonmem_version = "nm74gf"   # default version of NONMEM to use
+)
+
+set.seed(1)
+times <- c(c(1, 4)/24, 1, 3, 7, 14, 21)
+t_lo <- times - c(rep(1/24, 2), rep(3/24, 5))
+t_hi <- times + c(rep(1/24, 2), rep(3/24, 5))
+```
+
+``` r
+walk(seq_len(n_rep), function(run_num) {
+  write_data(design_dir, run_num, .times = times,
+             .times_lo = t_lo, .times_hi = t_hi)
+  run_model(design_dir, run_num)
+})
+```
+
+``` r
+est <- get_est(design_dir)
+saveRDS(est, "ex2_est1.rds")
+```
+
+``` r
+est <- readRDS("ex2_est1.rds")
+plot_est(est)
+```
+
+![](optimal_design_files/figure-gfm/unnamed-chunk-60-1.png)<!-- -->
+
+``` r
+sum_est(est) %>% 
+  mutate(poped_pct_rse = get_rse(evaluate.fim(poped_db_mrg),
+                                 poped_db_mrg)) %>% 
+  select(param, poped_pct_rse, everything())
+```
+
+    . # A tibble: 10 x 4
+    .    param      poped_pct_rse sim_pct_rse sim_pct_bias
+    .    <fct>              <dbl>       <dbl>        <dbl>
+    .  1 THETA1             10.9        13.9         13.6 
+    .  2 THETA2             10.7        17.1          1.81
+    .  3 THETA3              7.94       38.4         15.5 
+    .  4 THETA4              6.36       10.4          6.63
+    .  5 THETA5              8.89       16.9         -5.77
+    .  6 THETA6              3.62        9.56        -4.43
+    .  7 OMEGA(1,1)         39.0        38.9        -11.9 
+    .  8 OMEGA(2,2)         32.1        51.1         24.6 
+    .  9 OMEGA(4,4)         31.7        52.3        -12.6 
+    . 10 SIGMA(1,1)         10.8        12.3         -6.98
 
 # Other resources
 

@@ -65,6 +65,8 @@ requireNamespace("metrumrg")
 library(tidyverse)
 library(mrgsolve)
 library(PopED)
+library(rbabylon) 
+theme_set(theme_bw())
 ```
 
 # Introducing our example
@@ -296,8 +298,7 @@ plot_model_prediction(
   facet_scales = "free_x",
   model_num_points = 200
 ) +
-  labs(x = "Time from dose (h)") +
-  theme_bw()
+  labs(x = "Time from dose (h)")
 ```
 
 # Evaluate FIM
@@ -447,8 +448,7 @@ plot_model_prediction(
   facet_scales = "free_x",
   model_num_points = 200
 ) +
-  labs(x = "Time from dose (h)") +
-  theme_bw()
+  labs(x = "Time from dose (h)")
 ```
 
 This second-to-last sample at 32 hours would be at 4 PM the day after an 8 AM final dose.  More practical, and we don't seem to lose too much in terms of RSE.
@@ -473,6 +473,227 @@ plot_efficiency_of_windows(
 ```
 
 The 100 sets of simulated samples show no significant deviations from the RSEs for the optimal samples.
+
+# Stochastic Simulation and Estimation
+
+```{r}
+n_sub <- 12
+n_rep <- 100
+ctl_template <- readLines(file.path("nonmem", "template_ex1.ctl"))
+true_vals <- tibble(
+  THETA1 = 10, THETA2 = 100, THETA3 = 0.25,
+  `SIGMA(1,1)` = 0.05, `SIGMA(2,2)` = 1,
+  `OMEGA(1,1)` = 0.08, `OMEGA(2,2)` = 0.1, `OMEGA(3,3)` = 0.2
+) %>% 
+  gather("param", "value")
+```
+
+We'll need some functions to write out datasets and control streams for each replicate.
+
+This first function writes out a CSV dataset with dosing and (to be simulated) observations events for a single replicate.
+
+```{r}
+write_data <- function(.design_dir, .run_num, .times = NULL, .times_lo = NULL, .times_hi = NULL) {
+  set.seed(.run_num)
+  if (is.null(.times_lo)) {
+    pk <- tibble(
+      TIME = .times,
+      AMT = 0,
+      CMT = 2,
+      EVID = 0,
+      SS = 0,
+      II = 0
+    ) %>% 
+      expand_grid(ID = seq_len(n_sub))
+  } else {
+    pk <- tibble(
+      t_lo = .times_lo,
+      t_hi = .times_hi,
+      AMT = 0,
+      CMT = 2,
+      EVID = 0,
+      SS = 0,
+      II = 0
+    ) %>% 
+      expand_grid(ID = seq_len(n_sub)) %>% 
+      mutate(TIME = runif(n(), t_lo, t_hi))
+  }
+  data <- bind_rows(
+    tibble(
+      TIME = c(0, 24),
+      AMT = 10 * 1000,
+      CMT = 1,
+      SS = c(0, 1),
+      II = c(0, 24),
+      EVID = 1
+    ) %>%
+      expand_grid(
+        ID = seq_len(n_sub)
+      ),
+    pk
+  ) %>% 
+    arrange(ID, TIME, desc(EVID)) %>% 
+    mutate(DV = NA, MDV = if_else(EVID == 1, 1, 0), WT = 32) %>% 
+    select(ID, TIME, EVID, MDV, CMT, AMT, SS, II, DV, WT)
+  write_csv(data, file.path(.design_dir, paste0(.run_num, ".csv")), na = ".")
+}
+```
+
+The next function performs 2 steps for each replicate: (1) take the template control stream and adjusts it to point to the relevant dataset and set the random seed; and (2) runs the model using `rbabylon`.
+
+```{r}
+run_model <- function(.design_dir, .run_num) {
+  # Modify and write the control stream
+  ctl_template %>% 
+    str_replace("run_num", as.character(.run_num)) %>% 
+    str_replace("data_fname", paste0("../", .run_num, ".csv")) %>% 
+    writeLines(file.path(.design_dir, paste0(.run_num, ".ctl")))
+  
+  # Run the model
+  new_model(
+    .yaml_path = file.path(.design_dir, paste0(.run_num, ".yaml")),
+    .description = .run_num
+  ) %>%
+    submit_model()
+}
+```
+
+```{r}
+get_est <- function(.design_dir) {
+  est <- map_dfr(seq_len(n_rep), function(.run_num) {
+    mod <- read_model(file.path(.design_dir, paste0(.run_num, ".yaml")))
+    mod_sum <- try(mod %>% model_summary(), silent = TRUE)
+    if (inherits(mod_sum, "try-error")) return(NULL)
+    #if (mod_sum$run_heuristics$minimization_terminated) return(NULL)
+    mod_sum %>% 
+      param_estimates() %>% 
+      filter(fixed == 0) %>% 
+      select(param = names, estimate) %>% 
+      mutate(rep = .run_num)
+  }) %>% 
+    left_join(true_vals) %>% 
+    mutate(
+      param = factor(param, levels = unique(.[["param"]])),
+      pct_bias = (estimate - value) / abs(value) * 100
+    ) %>% 
+    filter(abs(pct_bias) < 5000)
+  return(est)
+}
+
+plot_est <- function(.est) {
+  .est %>% 
+    mutate(type = substr(param, 1, 5)) %>% 
+    ggplot(aes(param, pct_bias, fill = type)) +
+    geom_boxplot() +
+    #geom_violin() +
+    labs(x = NULL, y = "Relative Bias (%)") +
+    theme(legend.position = "none")
+}
+
+sum_est <- function(.est) {
+  output <- .est %>% 
+    group_by(param) %>% 
+    summarise(
+      sim_pct_rse = sd(estimate) / abs(first(value)) * 100,
+      sim_pct_bias = mean(pct_bias)
+    )
+  n_success <- n_distinct(.est$rep)
+  #message(glue::glue("{n_success} out of {n_rep} runs successful."))
+  
+  return(output)
+}
+```
+
+Set up `rbabylon`.
+
+```{r}
+# setup bbi path
+# you must have a working installation of babylon at `/data/apps/bbi` for this to work. 
+# If you have one somewhere else, just change the path here. If not, please download from https://github.com/metrumresearchgroup/babylon/releases
+options('rbabylon.bbi_exe_path' = '/data/apps/bbi')
+```
+
+## Design 1: proposed sampling.
+
+```{r eval=FALSE}
+design_dir <- file.path("nonmem", "ex1_design1")
+# create babylon.yaml in model directory
+bbi_init(
+  .dir = design_dir,           # your modeling directory
+  .nonmem_dir = "/opt/NONMEM", # directory where NONMEM is installed
+  .nonmem_version = "nm74gf"   # default version of NONMEM to use
+)
+
+set.seed(1)
+# add 24 hours to SS samples, since we're including a SS dose at 24 hours
+times <- c(5, c(rep(24, 3), 168) + 24)
+```
+
+```{r eval=FALSE}
+walk(seq_len(n_rep), function(run_num) {
+  write_data(design_dir, run_num, .times = times)
+  run_model(design_dir, run_num)
+})
+```
+
+```{r eval=FALSE}
+est <- get_est(design_dir)
+saveRDS(est, "ex1_est1.rds")
+```
+
+```{r}
+est <- readRDS("ex1_est1.rds")
+plot_est(est) + scale_y_continuous(limits =  c(-110, 500))
+```
+
+```{r message=TRUE}
+sum_est(est) %>% 
+  mutate(poped_pct_rse = get_rse(evaluate.fim(poped_db2), poped_db2)) %>% 
+  select(param, poped_pct_rse, everything())
+```
+
+## Design 2: Near-optimal design with windows
+
+```{r eval=FALSE}
+design_dir <- file.path("nonmem", "ex1_design2")
+# create babylon.yaml in model directory
+bbi_init(
+  .dir = design_dir,           # your modeling directory
+  .nonmem_dir = "/opt/NONMEM", # directory where NONMEM is installed
+  .nonmem_version = "nm74gf"   # default version of NONMEM to use
+)
+
+set.seed(1)
+# add 24 hours to SS samples, since we're including a SS dose at 24 hours
+times <- c(0.5, c(rep(24, 3), 32, 168) + 24)
+t_lo <- times - c(0.25, rep(0, 3), 2, 0)
+t_hi <- times + c(0.25, rep(1, 3), 2, 4)
+```
+
+```{r eval=FALSE}
+walk(seq_len(n_rep), function(run_num) {
+  write_data(design_dir, run_num, .times = times,
+             .times_lo = t_lo, .times_hi = t_hi)
+  run_model(design_dir, run_num)
+})
+```
+
+```{r eval=FALSE}
+est <- get_est(design_dir)
+saveRDS(est, "ex1_est2.rds")
+```
+
+```{r}
+est <- readRDS("ex1_est2.rds")
+plot_est(est)
+```
+
+```{r message=TRUE}
+sum_est(est) %>% 
+  mutate(poped_pct_rse = get_rse(evaluate.fim(poped_db_practical),
+                                 poped_db_practical)) %>% 
+  select(param, poped_pct_rse, everything())
+```
 
 # A more complex example using `mrgsolve`
 
@@ -567,7 +788,7 @@ fg <- function(x, a, bpop, b, bocc){
     V1    = bpop[4] * exp(b[3]),
     Q     = bpop[5],
     V2    = bpop[6],
-    DOSE  = a[1] * 1000
+    DOSE  = a[1] 
   )
   return(parameters) 
 }
@@ -579,19 +800,19 @@ fg <- function(x, a, bpop, b, bocc){
 poped_db_mrg <- create.poped.database(
   ff_fun = ff,
   fg_fun = fg,
-  fError_fun = feps.add.prop,
-  bpop = c(CL = 30, VMAX = 10000, KM = 5, V1 = 50, Q = 30, V2 = 40), 
-  notfixed_bpop = c(1, 1, 1, 1, 0, 0),
-  d = c(CL = 0.2, VMAX = 0.1, V1 = 0.1), 
-  sigma = c(0.05, 1),
+  fError_fun = feps.prop,
+  bpop = c(CL = 0.5, VMAX = 20, KM = 1.2, V1 = 2.5, Q = 10, V2 = 4), 
+  notfixed_bpop = c(1, 1, 1, 1, 1, 1),
+  d = c(CL = 0.2, VMAX = 0.2, V1 = 0.1),
+  sigma = c(0.15),
   m = 6,
-  groupsize = 8,
-  xt = c(c(1, 4, 8, 12, 24)/24, 2, 7, 14, 21),
-  #xt = c(c(4, 12, 24)/24, 7, 14, 21),
+  groupsize = 6,
+  xt = c(c(1, 4)/24, 1, 3, 7, 14, 21),
   minxt = 0,
   maxxt = 21,
+  #discrete_xt = list(c((1:4)/24, 1:21)),
   bUseGrouped_xt = TRUE,
-  a = cbind(DOSE = c(0.1, 0.3, 1, 3, 10, 30))
+  a = cbind(DOSE = c(0.03, 0.1, 0.3, 1, 3, 10))
 )
 ```
 
@@ -603,8 +824,7 @@ plot_model_prediction(
   model_num_points = 200
 ) +
   labs(x = "Time from dose (days)") +
-  scale_y_log10(lim = c(0.1, 1e6)) +
-  theme_bw()
+  scale_y_log10(lim = c(0.01, 1e4))
 ```
 
 ## Evaluate FIM
@@ -614,62 +834,20 @@ FIM_mrg <- evaluate.fim(poped_db_mrg)
 get_rse(FIM_mrg, poped_db_mrg)
 ```
 
-## *D*-optimal design
-
-### Starting from the original design
-
-```{r optimal_mrg,eval=FALSE}
-output_mrg <- poped_optim(
-  poped_db_mrg,
-  opt_xt = TRUE,
-  parallel = TRUE,
-  parallel_type = "multicore",
-  seed = 1
-)
-saveRDS(output_mrg, "opt4.rds")
-```
-
-```{r}
-output_mrg <- readRDS("opt4.rds")
-summary(output_mrg)
-```
-
-This took 45 minutes on 16 cores, but it's awesome.
-
-## Near-optimal design
-
-Again, this optimal design isn't entirely practical.  The samples are very precise at impractical times, and some are clumped together.  We'll attempt to make this a bit more workable without losing too much parameter precision.
-
-```{r}
-poped_db_practical_mrg <- create.poped.database(
-  poped_db_mrg,
-  xt = c(15/60/24, 3, 4, 7, 8, 11, 12, 16, 21)
-)
-FIM_practical_mrg <- evaluate.fim(poped_db_practical_mrg) 
-get_rse(FIM_practical_mrg, poped_db_practical_mrg)
-plot_model_prediction(
-  poped_db_practical_mrg,
-  model_num_points = 200
-) +
-  labs(x = "Time from dose (days)") +
-  scale_y_log10(lim = c(0.1, 1e6)) +
-  theme_bw()
-```
-
-Looks good.
+The RSEs look good.
 
 ## Sampling windows
 
 We'll allow:
 
-* up to 30 minutes after dosing
+* 1 hour before or after samples on Day 1
 * 3 hours before or after other sampling times
 
 ```{r windows_mrg,eval=FALSE}
 p <- plot_efficiency_of_windows(
-  poped_db_practical_mrg,
-  xt_plus  = c(15/60/24, rep(3/24, 8)),
-  xt_minus = c(15/60/24, rep(3/24, 8))
+  poped_db_mrg,
+  xt_plus  = c(rep(1/24, 2), rep(3/24, 5)),
+  xt_minus = c(rep(1/24, 2), rep(3/24, 5))
 )
 saveRDS(p, "windows_mrg.rds")
 ```
@@ -679,7 +857,108 @@ p <- readRDS("windows_mrg.rds")
 p
 ```
 
-Again, the 100 sets of simulated samples show no significant deviations from the RSEs for the optimal samples, so we're golden.
+Again, the 100 sets of simulated samples show no significant deviations from the RSEs for the original samples, so we're golden.
+
+## Stochastic Simulation and Estimation
+
+```{r}
+n_sub_per_grp <- 6
+doses <- c(0.03, 0.1, 0.3, 1, 3, 10)
+n_doses <- length(doses)
+n_sub <- n_sub_per_grp * n_doses
+n_rep <- 100
+ctl_template <- readLines(file.path("nonmem", "template_ex2.ctl"))
+true_vals <- tibble(
+  THETA1 = 0.5, THETA2 = 20, THETA3 = 1.2,
+  THETA4 = 2.5, THETA5 = 10, THETA6 = 4,
+  `SIGMA(1,1)` = 0.15,
+  `OMEGA(1,1)` = 0.2, `OMEGA(2,2)` = 0.2, `OMEGA(4,4)` = 0.1
+  #`OMEGA(5,5)` = 0.1, `OMEGA(6,6)` = 0.1
+) %>% 
+  gather("param", "value")
+```
+
+We'll need to rewrite the function for writing the datasets for this example.
+
+```{r}
+write_data <- function(.design_dir, .run_num, .times = NULL, .times_lo = NULL, .times_hi = NULL) {
+  set.seed(.run_num)
+  if (is.null(.times_lo)) {
+    pk <- tibble(
+      TIME = .times,
+      AMT = 0,
+      CMT = 1,
+      EVID = 0,
+    ) %>% 
+      expand_grid(ID = seq_len(n_sub))
+  } else {
+    pk <- tibble(
+      t_lo = .times_lo,
+      t_hi = .times_hi,
+      AMT = 0,
+      CMT = 1,
+      EVID = 0,
+    ) %>% 
+      expand_grid(ID = seq_len(n_sub)) %>% 
+      mutate(TIME = runif(n(), t_lo, t_hi))
+  }
+  data <- bind_rows(
+    tibble(
+      TIME = 0,
+      AMT = doses * 1000,
+      CMT = 1,
+      EVID = 1
+    ) %>%
+      slice(rep(seq_len(n()), each = n_sub_per_grp)) %>% 
+      mutate(ID = row_number()),
+    pk
+  ) %>% 
+    arrange(ID, TIME, desc(EVID)) %>% 
+    mutate(DV = NA, MDV = if_else(EVID == 1, 1, 0)) %>% 
+    select(ID, TIME, EVID, MDV, CMT, AMT, DV)
+  write_csv(data, file.path(.design_dir, paste0(.run_num, ".csv")), na = ".")
+}
+```
+
+```{r eval=FALSE}
+design_dir <- file.path("nonmem", "ex2_design1")
+# create babylon.yaml in model directory
+bbi_init(
+  .dir = design_dir,           # your modeling directory
+  .nonmem_dir = "/opt/NONMEM", # directory where NONMEM is installed
+  .nonmem_version = "nm74gf"   # default version of NONMEM to use
+)
+
+set.seed(1)
+times <- c(c(1, 4)/24, 1, 3, 7, 14, 21)
+t_lo <- times - c(rep(1/24, 2), rep(3/24, 5))
+t_hi <- times + c(rep(1/24, 2), rep(3/24, 5))
+```
+
+```{r eval=FALSE}
+walk(seq_len(n_rep), function(run_num) {
+  write_data(design_dir, run_num, .times = times,
+             .times_lo = t_lo, .times_hi = t_hi)
+  run_model(design_dir, run_num)
+})
+```
+
+```{r eval=FALSE}
+est <- get_est(design_dir)
+saveRDS(est, "ex2_est1.rds")
+```
+
+```{r}
+est <- readRDS("ex2_est1.rds")
+plot_est(est)
+```
+
+```{r message=TRUE}
+sum_est(est) %>% 
+  mutate(poped_pct_rse = get_rse(evaluate.fim(poped_db_mrg),
+                                 poped_db_mrg)) %>% 
+  select(param, poped_pct_rse, everything())
+```
 
 # Other resources
 
