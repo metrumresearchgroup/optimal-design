@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>A Gentle Introduction to Optimal Design for Pharmacometric Models</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Tim Waterhouse and Kyle Baron" />
+    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="libs/remark-css-0.0.1/default-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="tweaks.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+
+
+
+
+
+layout: true
+
+&lt;div class="my-footer"&gt;&lt;/div&gt;       
+
+---
+
+background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/4422/36449778360_8683e16f7f_k_d.jpg)
+background-size: cover
+  
+# Why listen to this talk?
+
+.pull-left[
+* You want to design a study
+{{content}}
+]
+
+--
+
+* You'll be fitting a model to the results
+{{content}}
+
+--
+
+* You don't want that model to fail spectacularly
+{{content}}
+
+--
+
+* You don't have the time or the patience to run a bunch of simulations
+{{content}}
+
+
+???
+
+Image credit: [Flickr](https://www.flickr.com/photos/18378305@N00/36449778360)
+
+---
+
+background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/35/70342823_cd9f9ec744_h_d.jpg)
+background-size: cover
+  
+# Outline
+
+* Optimal design background
+* Software tools
+
+???
+
+Image credit: [Flickr](https://www.flickr.com/photos/davidden/70342823/)
+---
+class: inverse, center, middle
+
+# Optimal design background
+
+---
+
+# Meet the Fisher information matrix
+
+.pull-left[
+$$ M_F(\mathbf{\Psi},\xi)
+= - \operatorname{E}
+\left[\left.
+ \frac{\partial^2}{\partial\mathbf{\Psi} \partial\mathbf{\Psi}^T} \log L(\mathbf{\Psi};y)
+\right|\mathbf{\Psi}\right] $$
+]
+
+.pull-right[
+where
+
+* `\(\mathbf{\Psi}\)` is the vector of populations parameters (e.g. `THETA`s, `OMEGA`s, and `SIGMA`s in NONMEM),
+* `\(y\)` is the vector of observations,
+* `\(\xi\)` is the vector of design variables (e.g. sampling times), and
+* `\(\log L\)` is the log-likelihood.
+]
+
+---
+
+# Why should I care about that thing?
+
+[Cramér-Rao  lower bound](https://en.wikipedia.org/wiki/Cram%C3%A9r%E2%80%93Rao_bound):
+
+$$
+\mathrm{cov}(\hat{\mathbf{\Psi}}) \geq  M_F(\mathbf{\Psi},\xi)
+$$
+
+when `\(\hat{\mathbf{\Psi}}\)` is an unbiased estimator of `\(\mathbf{\Psi}\)`.
+
+--
+
+This means we have a quick way of evaluating (a lower bound on) the precision of our parameter estimates.
+
+--
+
+.center[![](https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/237/smiling-face-with-sunglasses_1f60e.png)]
+
+???
+
+As the name implies, optimal designs are experimental designs that are optimal with respect to some criterion.  Many such criteria exist, but most involve the [Fisher information matrix](https://en.wikipedia.org/wiki/Fisher_information) (FIM).  This matrix is useful because it gives us a [lower bound](https://en.wikipedia.org/wiki/Cram%C3%A9r%E2%80%93Rao_bound) on the covariance matrix of our parameter estimates.
+
+
+---
+
+# OK, but really. Why should I care about that thing?
+
+.pull-left[
+* `\(D\)`-optimality criterion
+
+
+* blah
+]
+
+--
+
+.pull-right[
+
+![](pics/confidence_ellipsoid.svg)&lt;!-- --&gt;
+
+
+]
+
+???
+
+The most commonly used criterion is the *D*-optimalilty criterion.  *D*-optimal designs maximize the determinant of the FIM, which is equivalent to minimizing the (lower bound of) the determinant of the covariance matrix of the parameter estimates.  For a single parameter, this means we're minimizing the width of its confidence interval, estimating it as precisely as possible.  Extending this to multiple parameters, we're minimizing the volume of the confidence ellipsoid, which loosely translates to maximizing the overall precision of parameter estimates.
+
+The FIM is typically notated by something like *M*&lt;sub&gt;*F*&lt;/sub&gt;(&amp;Phi;,&amp;Xi;), where &amp;Phi; is the vector of parameter values (e.g. *CL*, &amp;omega;&lt;sub&gt;*CL*&lt;/sub&gt;, etc.) and &amp;Xi; is the vector of design variables (e.g. dose levels, PK sampling times, etc.).  For linear models, the dependence on the parameters disappears.  Unfortunately for us, this is not the case for nonlinear models.  So in order to design our experiment in a way that will produce the best parameter estimates, we first need to know the values of those parameters.  This is the catch-22 of optimal design.  The good news is that we usually have *some* sense of parameter values from earlier clinical trials or even predictions from animal data.  We can even incorporate uncertainty of the estimates (e.g. with *ED*- or *HC*ln*D*-optimality).
+
+---
+
+# Nonlinear mixed effects models
+
+More often than not, we're dealing with nonlinear mixed effects (NLME) models.  Since the FIM depends on the likelihood function, and there is sadly no analytic expression for the likelihood in NLME models, we must rely on approximations.  See Mentre1997-ds, Retout2001-lw, and Retout2003-jx for FIM approximations available to us.
+
+So our FIM is
+
+* an approximation
+* to a lower bound
+* that depends on the parameter values.
+
+How useful could that even be?  Pretty useful, actually.  In most cases you'll probably find that you have adequate information on parameter estimates and that these approximate lower bounds aren't too far off what you'll get from simulations.
+
+Either way, I **strongly** recommend that any optimal design exercise is capped off with confirmatory simulations using the tool (e.g. NONMEM) that you'll be using in the actual analysis of the data.
+
+---
+
+# Evaluation vs Optimization
+
+Optimal design tools can be used in the way that the name implies (to actually optimize a study), or we can simply evaluate a design with a quick calculation of the FIM (and a translation of the FIM to expected relative standard errors).  Optimization is usually a "last resort", and most of the time you'll only need to evaluate a few potential designs before settling on the answer.
+
+That's not to say that optimization doesn't have its place.  For example, resources may be very tightly constrained, or intuitive selection of potential doses or sampling times doesn't produce sufficient results.  In these cases, we'd use a search algorithm to determine an optimal design.
+
+---
+
+# Sampling windows
+
+A common application of optimal design is the selection of PK sampling times.  In practice, we often can't practically collect PK samples at precise times.  Also, optimization of sampling times will usually tell you to collect samples at seemingly bizarre times like 3.4756 hours.  Or worse, it may require *multiple* samples at the same time (if you can't specify a minimum period between samples).  In these cases, we can specify windows of time for each collection.
+
+Although methods exist for optimal determination of the windows, you will mostly likely be able to do a perfectly good job yourself by picking these manually.  You can then determine the suitability of the windows by seeing how uniform sampling within the windows impacts relative standard errors (both in optimal design tools like `PopED` or in your simulation).
+
+
+---
+class: inverse, center, middle
+
+# Example: closed-from PK model
+
+---
+class: inverse, center, middle
+
+# Example: ODE PK model
+
+---
+class: inverse, center, middle
+
+# Example: ODE PK/PD model
+
+---
+
+https://www.flickr.com/photos/msbhaven/7404593082
+https://www.flickr.com/photos/tinahesmansaey/2599260050
+https://www.flickr.com/photos/hyperxp/6847495120
+https://www.flickr.com/photos/dmuth/6039404494
+https://www.flickr.com/photos/dmuth/6039404304
+
+https://www.flickr.com/photos/dok1/3581901453
+https://www.flickr.com/photos/bucky1105/2334669404
+https://www.flickr.com/photos/lalonsorm/16856604020
+https://www.flickr.com/photos/gmanviz/48835009102
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false,
+"ratio": "16:9"
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

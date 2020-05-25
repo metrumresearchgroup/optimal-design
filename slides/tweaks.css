@@ -1,0 +1,25 @@
+.title-slide {
+  background-image: url("pics/title_background.png");
+  background-size: cover;
+}
+.title-slide h1, h2, h3 {
+  text-align: center;
+  /*color: #F7F8FA;*/
+}
+
+.title-slide .remark-slide-number {
+  display: none;
+}
+
+.my-footer {
+  content: "";
+  position: absolute;
+  bottom: 15px;
+  left:    8px;
+  height: 50px;
+  width: 905px;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-image: url("pics/Logo_M.png");
+}
+
