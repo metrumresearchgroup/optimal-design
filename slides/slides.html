@@ -15,6 +15,18 @@
 
 
 
+
+class: title-slide   
+
+# A Gentle Introduction to Optimal Design &lt;br/&gt; for Pharmacometric Models
+## with PopED and mrgsolve
+
+## Tim Waterhouse and Kyle Baron &lt;br/&gt; Metrum Research Group
+## 8 June, 2020
+
+---
+
+
 layout: true
 
 &lt;div class="my-footer"&gt;&lt;/div&gt;       
@@ -59,19 +71,48 @@ background-size: cover
 # Outline
 
 * Optimal design background
+
 * Software tools
 
 ???
 
 Image credit: [Flickr](https://www.flickr.com/photos/davidden/70342823/)
+
 ---
+
+class: poll-slide
+
+# Poll Question #1
+
+## What is your experience with optimal design?
+
+1. Never heard of it.
+
+--
+
+2. I've seen it around, and I'd like to try it.
+
+--
+
+3. I've seen it around, but it seems kinda fishy.
+
+--
+
+4. I've used optimal design for some studies.
+
+--
+
+5. I invert Fisher information matrices in my head.
+
+---
+
 class: inverse, center, middle
 
 # Optimal design background
 
 ---
 
-# Meet the Fisher information matrix
+# Meet the Fisher information matrix (FIM)
 
 .pull-left[
 $$ M_F(\mathbf{\Psi},\xi)
@@ -79,15 +120,20 @@ $$ M_F(\mathbf{\Psi},\xi)
 \left[\left.
  \frac{\partial^2}{\partial\mathbf{\Psi} \partial\mathbf{\Psi}^T} \log L(\mathbf{\Psi};y)
 \right|\mathbf{\Psi}\right] $$
-]
 
-.pull-right[
 where
 
 * `\(\mathbf{\Psi}\)` is the vector of populations parameters (e.g. `THETA`s, `OMEGA`s, and `SIGMA`s in NONMEM),
+
 * `\(y\)` is the vector of observations,
+
 * `\(\xi\)` is the vector of design variables (e.g. sampling times), and
+
 * `\(\log L\)` is the log-likelihood.
+]
+
+.pull-right[
+![](pics/Fisher1946.jpeg)&lt;!-- --&gt;
 ]
 
 ---
@@ -97,14 +143,18 @@ where
 [Cramér-Rao  lower bound](https://en.wikipedia.org/wiki/Cram%C3%A9r%E2%80%93Rao_bound):
 
 $$
-\mathrm{cov}(\hat{\mathbf{\Psi}}) \geq  M_F(\mathbf{\Psi},\xi)
+\mathrm{cov}(\hat{\mathbf{\Psi}}) \geq  \left[M_F(\mathbf{\Psi},\xi)\right]^{-1}
 $$
 
 when `\(\hat{\mathbf{\Psi}}\)` is an unbiased estimator of `\(\mathbf{\Psi}\)`.
 
 --
 
-This means we have a quick way of evaluating (a lower bound on) the precision of our parameter estimates.
+* Relative standard errors (RSEs) can be obtained from the diagonals of the inverse of the FIM
+
+--
+
+* This means we have a quick way of evaluating (a lower bound on) the precision of our parameter estimates.
 
 --
 
@@ -120,30 +170,97 @@ As the name implies, optimal designs are experimental designs that are optimal w
 # OK, but really. Why should I care about that thing?
 
 .pull-left[
+$$
+\mathrm{cov}(\hat{\mathbf{\Psi}}) \geq  M_F(\mathbf{\Psi},\xi)
+$$
+]
+
+.pull-right[
 * `\(D\)`-optimality criterion
-
-
-* blah
+{{content}}
 ]
 
 --
 
-.pull-right[
+* `\(D\)`-optimal designs maximise the determinant of the FIM
+{{content}}
 
-![](pics/confidence_ellipsoid.svg)&lt;!-- --&gt;
+--
 
+* Equivalent to minimising the volume of the confidence ellipsoid of the parameter estimates
+{{content}}
 
-]
+--
+
+* Huh?
+{{content}}
 
 ???
 
 The most commonly used criterion is the *D*-optimalilty criterion.  *D*-optimal designs maximize the determinant of the FIM, which is equivalent to minimizing the (lower bound of) the determinant of the covariance matrix of the parameter estimates.  For a single parameter, this means we're minimizing the width of its confidence interval, estimating it as precisely as possible.  Extending this to multiple parameters, we're minimizing the volume of the confidence ellipsoid, which loosely translates to maximizing the overall precision of parameter estimates.
 
-The FIM is typically notated by something like *M*&lt;sub&gt;*F*&lt;/sub&gt;(&amp;Phi;,&amp;Xi;), where &amp;Phi; is the vector of parameter values (e.g. *CL*, &amp;omega;&lt;sub&gt;*CL*&lt;/sub&gt;, etc.) and &amp;Xi; is the vector of design variables (e.g. dose levels, PK sampling times, etc.).  For linear models, the dependence on the parameters disappears.  Unfortunately for us, this is not the case for nonlinear models.  So in order to design our experiment in a way that will produce the best parameter estimates, we first need to know the values of those parameters.  This is the catch-22 of optimal design.  The good news is that we usually have *some* sense of parameter values from earlier clinical trials or even predictions from animal data.  We can even incorporate uncertainty of the estimates (e.g. with *ED*- or *HC*ln*D*-optimality).
+---
+
+# This is a confidence ellipsoid in 2 dimensions
+
+.center[
+&lt;img src="pics/confidence_ellipsoid.svg" width="50%" /&gt;
+]
 
 ---
 
-# Nonlinear mixed effects models
+background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/7241/7404593082_9877908077_k_d.jpg)
+background-size: cover
+  
+# Catch-22 of optimal design
+
+.pull-left[
+* For linear models, the dependence of `\(M_F(\mathbf{\Psi},\xi)\)` on `\(\mathbf{\Psi}\)` disappears
+{{content}}
+]
+
+--
+
+* No such luck for nonlinear models
+{{content}}
+
+--
+
+* In order to design our experiment in a way that will produce the best parameter estimates, we first need to know the values of those parameters
+{{content}}
+
+--
+
+&lt;img src="https://cdn.shopify.com/s/files/1/1061/1924/products/7_large.png?v=1571606116" width="30%" /&gt;
+{{content}}
+
+???
+
+The FIM is typically notated by something like *M*&lt;sub&gt;*F*&lt;/sub&gt;(&amp;Phi;,&amp;Xi;), where &amp;Phi; is the vector of parameter values (e.g. *CL*, &amp;omega;&lt;sub&gt;*CL*&lt;/sub&gt;, etc.) and &amp;Xi; is the vector of design variables (e.g. dose levels, PK sampling times, etc.).  For linear models, the dependence on the parameters disappears.  Unfortunately for us, this is not the case for nonlinear models.  So in order to design our experiment in a way that will produce the best parameter estimates, we first need to know the values of those parameters.  This is the catch-22 of optimal design.  The good news is that we usually have *some* sense of parameter values from earlier clinical trials or even predictions from animal data.  We can even incorporate uncertainty of the estimates (e.g. with *ED*- or *HC*ln*D*-optimality).
+
+Image credit: [Flickr](https://www.flickr.com/photos/msbhaven/7404593082)
+
+---
+
+# Nonlinear mixed effects models are even more problematic
+
+.pull-left[
+* No analytic expression for the likelihood, so we rely on approximations
+
+* So our FIM is
+
+    * an approximation
+
+    * to a lower bound
+
+    * that depends on the parameter values
+]
+
+.footnote[Mentre, Mallet, and Baccar (1997)&lt;/br&gt;
+Retout, Duffull, and Mentre (2001)&lt;/br&gt;
+Retout and Mentre (2003)]
+
+???
 
 More often than not, we're dealing with nonlinear mixed effects (NLME) models.  Since the FIM depends on the likelihood function, and there is sadly no analytic expression for the likelihood in NLME models, we must rely on approximations.  See Mentre1997-ds, Retout2001-lw, and Retout2003-jx for FIM approximations available to us.
 
@@ -153,21 +270,95 @@ So our FIM is
 * to a lower bound
 * that depends on the parameter values.
 
+---
+
+background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/3061/2599260050_539b8904c7_k_d.jpg)
+background-size: cover
+  
+# All is not lost
+
+.pull-left[
+* Usually we have adequate information on parameters estimates
+{{content}}
+]
+
+--
+
+* Approximate lower bounds are usually not far off from values obtained from simulation
+{{content}}
+
+--
+
+* More to come on simulation...
+{{content}}
+
+???
+
 How useful could that even be?  Pretty useful, actually.  In most cases you'll probably find that you have adequate information on parameter estimates and that these approximate lower bounds aren't too far off what you'll get from simulations.
 
 Either way, I **strongly** recommend that any optimal design exercise is capped off with confirmatory simulations using the tool (e.g. NONMEM) that you'll be using in the actual analysis of the data.
 
+Image credit: [Flickr](https://www.flickr.com/photos/tinahesmansaey/2599260050)
+
 ---
 
-# Evaluation vs Optimization
+background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/7049/6847495120_b74032750a_k_d.jpg)
+background-size: cover
+  
+# Evaluation vs Optimisation
+
+.pull-left[
+* Optimal design can be used to optimise a study (duh)
+{{content}}
+]
+
+--
+
+* We can also just use the FIM to quickly evaluate a design by calculating RSEs
+{{content}}
+
+--
+
+* Optimisation is often a last resort (we can just evaluate a few candidate designs in many situations)
+{{content}}
+
+--
+
+* Sometimes resources are too tightly constrained or our intuition isn't good enough to find feasible designs without optimising using a search algorithm
+{{content}}
+
+???
 
 Optimal design tools can be used in the way that the name implies (to actually optimize a study), or we can simply evaluate a design with a quick calculation of the FIM (and a translation of the FIM to expected relative standard errors).  Optimization is usually a "last resort", and most of the time you'll only need to evaluate a few potential designs before settling on the answer.
 
 That's not to say that optimization doesn't have its place.  For example, resources may be very tightly constrained, or intuitive selection of potential doses or sampling times doesn't produce sufficient results.  In these cases, we'd use a search algorithm to determine an optimal design.
 
+Image credit: [Flickr](https://www.flickr.com/photos/hyperxp/6847495120)
+
 ---
 
 # Sampling windows
+
+.pull-left[
+![](slides_files/figure-html/unnamed-chunk-4-1.png)&lt;!-- --&gt;
+]
+
+.pull-right[
+* "Optimal" sampling times are often not practical
+{{content}}
+]
+
+--
+
+* Even without optimisation, we can't always collect samples at precise times
+{{content}}
+
+--
+
+* Sampling windows can be optimised or determined manually
+{{content}}
+
+???
 
 A common application of optimal design is the selection of PK sampling times.  In practice, we often can't practically collect PK samples at precise times.  Also, optimization of sampling times will usually tell you to collect samples at seemingly bizarre times like 3.4756 hours.  Or worse, it may require *multiple* samples at the same time (if you can't specify a minimum period between samples).  In these cases, we can specify windows of time for each collection.
 
@@ -175,9 +366,42 @@ Although methods exist for optimal determination of the windows, you will mostly
 
 
 ---
+
+# Tools for optimal design
+
+![](pics/tools.png)&lt;!-- --&gt;
+
+.footnote[Nyberg, Bazzoli, Ogungbenro, et al. (2014)]
+
+---
+
+# PopED
+
+.pull-left[
+![](pics/PopED_logo.png)&lt;!-- --&gt;
+]
+
+.pull-right[
+* https://andrewhooker.github.io/PopED/
+
+* Originally in O-Matrix and Matlab, now an R package
+]
+.footnote[Foracchia, Hooker, Vicini, et al. (2004) &lt;br&gt;
+Nyberg, Ueckert, Strömberg, et al. (2012)]
+
+---
+
+# SSE: Stochastic Simulation and Estimation
+
+.center[
+&lt;img src="pics/sse.svg" width="65%" /&gt;
+]
+
+---
+
 class: inverse, center, middle
 
-# Example: closed-from PK model
+# Example: closed-form PK model
 
 ---
 class: inverse, center, middle
@@ -191,8 +415,37 @@ class: inverse, center, middle
 
 ---
 
-https://www.flickr.com/photos/msbhaven/7404593082
-https://www.flickr.com/photos/tinahesmansaey/2599260050
+# References
+
+Foracchia, M, A. Hooker, P. Vicini, et al. (2004). "POPED, a software
+for optimal experiment design in population kinetics". In: _Comput.
+Methods Programs Biomed._ 74.1, pp. 29-46.
+
+Mentre, F, A. Mallet, and D. Baccar (1997). "Optimal design in
+random-effects regression models". In: _Biometrika_ 84.2, pp.
+429-442.
+
+Nyberg, J, C. Bazzoli, K. Ogungbenro, et al. (2014). "Methods and
+software tools for design evaluation for population
+pharmacokinetics-pharmacodynamics studies". In: _Br. J. Clin.
+Pharmacol._.
+
+Nyberg, J, S. Ueckert, E. A. Strömberg, et al. (2012). "PopED: an
+extended, parallelized, nonlinear mixed effects models optimal design
+tool". In: _Comput. Methods Programs Biomed._ 108.2, pp. 789-805.
+
+Retout, S, S. Duffull, and F. Mentre (2001). "Development and
+implementation of the population Fisher information matrix for the
+evaluation of population pharmacokinetic designs". In: _Comput.
+Methods Programs Biomed._ 65.2, pp. 141-151.
+
+Retout, S. and F. Mentre (2003). "Further developments of the Fisher
+information matrix in nonlinear mixed effects models with evaluation
+in population pharmacokinetics". In: _J. Biopharm. Stat._ 13.2, pp.
+209-227.
+
+---
+
 https://www.flickr.com/photos/hyperxp/6847495120
 https://www.flickr.com/photos/dmuth/6039404494
 https://www.flickr.com/photos/dmuth/6039404304

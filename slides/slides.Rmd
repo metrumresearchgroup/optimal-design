@@ -99,13 +99,29 @@ Image credit: [Flickr](https://www.flickr.com/photos/davidden/70342823/)
 
 ---
 
-# First poll
+class: poll-slide
 
-Blah?
+# Poll Question #1
 
-1. blah
-2. blah
-3. blah
+## What is your experience with optimal design?
+
+1. Never heard of it.
+
+--
+
+2. I've seen it around, and I'd like to try it.
+
+--
+
+3. I've seen it around, but it seems kinda fishy.
+
+--
+
+4. I've used optimal design for some studies.
+
+--
+
+5. I invert Fisher information matrices in my head.
 
 ---
 
@@ -422,13 +438,19 @@ knitr::include_graphics("pics/PopED_logo.png")
 
 ---
 
-# SSE
+# SSE: Stochastic Simulation and Estimation
+
+.center[
+```{r echo=F, out.width='65%'}
+knitr::include_graphics("pics/sse.svg")
+```
+]
 
 ---
 
 class: inverse, center, middle
 
-# Example: closed-from PK model
+# Example: closed-form PK model
 
 ---
 class: inverse, center, middle

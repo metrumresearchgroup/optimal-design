@@ -23,3 +23,20 @@
   background-image: url("pics/Logo_M.png");
 }
 
+
+.poll-slide {
+  background: linear-gradient(132deg, #ec5218, #1665c1);
+  background-size: 400% 400%;
+  animation: BackgroundGradient 10s ease infinite;
+  color: #fff;
+}
+
+.poll-slide h1, h2 {
+  text-align: center;
+}
+
+@keyframes BackgroundGradient {
+  0% {background-position: 0% 50%;}
+  50% {background-position: 100% 50%;}
+  100% {background-position: 0% 50%;}
+}
