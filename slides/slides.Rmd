@@ -564,7 +564,7 @@ class: poll-slide
 
 # Poll Question #2
 
-## Which of these designs will give us the best<sup>*</sup> RSE for KA, assuming a single 10 mg dose in 20 adult (70 kg) subjects?
+## Which of these designs will give us the best<sup>*</sup> RSE for KA, assuming a single 10 mg dose in 10 adult (70 kg) subjects?
 
 ```{r echo=FALSE}
 designs <- bind_cols(
@@ -613,7 +613,7 @@ class: poll-slide
 
 # Poll Question #2
 
-## Which of these designs will give us the best<sup>*</sup> RSE for KA, assuming a single 10 mg dose in 20 adult (70 kg) subjects?
+## Which of these designs will give us the best<sup>*</sup> RSE for KA, assuming a single 10 mg dose in 10 adult (70 kg) subjects?
 
 ```{r echo=FALSE, results='asis'}
 ff <- function(model_switch, xt, parameters, poped.db){
@@ -673,7 +673,7 @@ map_chr(unique(designs[["design"]]), function(.design) {
     poped_db,
     xt = tmp_xt
   )
-  rse <- round(unname(get_rse(evaluate.fim(tmp_poped_db), tmp_poped_db)[1]), 1)
+  rse <- round(unname(get_rse(evaluate.fim(tmp_poped_db), tmp_poped_db)[3]), 1)
   return(glue("* {.design} (first sample at {tmp_xt[1]} hours): RSE = {rse}%\n\n"))
 }) %>% 
   writeLines()
@@ -682,29 +682,32 @@ map_chr(unique(designs[["design"]]), function(.design) {
 .footnote[[*]According to `PopED`]
 ---
 
+background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/6136/6039404494_a6cccf1f4a_k_d.jpg)
+background-size: cover
+  
 # The `PopED` setup
 
+.pull-left[
 `PopED` requires 3 functions in order to define a model:
 
 * `ff()`, the structural model;
+
 * `fg()`, the parameter model (including IIV and IOV);
+
 * `feps()`, the residual error model.
+]
+
+???
 
 (The names of the functions can be different, but these are the naming conventions used by `PopED`.)  There are built-in `ff()` and `feps()` functions for basic structural models with additive and/or proportional residual error, but you'll need to at least write your own `fg()` function (don't worry, there are examples to get you started).
 
+Image credit: [Flickr](https://www.flickr.com/photos/dmuth/6039404494)
+
 ---
 
-# `ff()`
+# `ff()`: the structural model
 
-`PopED` expects a function with the following arguments:
-
-* `model_switch`: A vector of values, the same size as `xt`, identifying which model response should be computed for the corresponding `xt` value (e.g., for models with PK and PD responses).
-* `xt`: A vector of independent variable values (often time).
-* `parameters`: A named list of parameter values.
-* `poped.db`: A `PopED` database. This can be used to extract information that may be needed in the model file.
-
-We define a model with single dose and steady-state components, making use of the `model_switch` argument to determine which expression to use at each timepoint.
-
+.pull-left-60[
 ```{r}
 ff <- function(model_switch, xt, parameters, poped.db){
   with(as.list(parameters),{
@@ -727,21 +730,39 @@ ff <- function(model_switch, xt, parameters, poped.db){
   })
 }
 ```
+]
+
+.pull-right-40[
+`PopED` expects a function with the following arguments:
+
+* `model_switch`: A vector of values identifying which model response should be computed for the corresponding `xt` value
+
+* `xt`: A vector of independent variable values (often time).
+
+* `parameters`: A named list of parameter values.
+
+* `poped.db`: A `PopED` database.
+]
+
+???
+
+`PopED` expects a function with the following arguments:
+
+* `model_switch`: A vector of values, the same size as `xt`, identifying which model response should be computed for the corresponding `xt` value (e.g., for models with PK and PD responses).
+
+* `xt`: A vector of independent variable values (often time).
+
+* `parameters`: A named list of parameter values.
+
+* `poped.db`: A `PopED` database. This can be used to extract information that may be needed in the model file.
+
+We define a model with single dose and steady-state components, making use of the `model_switch` argument to determine which expression to use at each timepoint.
 
 ---
 
-# `fg()`
+# `fg()`: the parameter model
 
-Next is the parameter model, where we add IIV and/or IOV.  Again, there are several arguments that `PopED` expects:
-
-* `x`: A vector of discrete design variables (not used here).
-* `a`: A vector of covariates. Note that dose and dosing interval are also passed in as covariates, in addition to what we'd normally classify as covariates in a PK/PD model.
-* `bpop`: A vector of fixed effect parameters (i.e., `THETA`s).
-* `b`: A vector of individual IIV random effects (i.e., `ETA`s).
-* `bocc`: A vector of individual IOV random effects (i.e., `ETA`s) (not used here).
-
-In this example, we include IIV on `CL`, `V`, and `KA`, and pass through dose, tau, and body weight as covariates.
-
+.pull-left[
 ```{r}
 fg <- function(x, a, bpop, b, bocc){
   parameters = c(
@@ -757,15 +778,39 @@ fg <- function(x, a, bpop, b, bocc){
   return(parameters) 
 }
 ```
+]
+
+.pull-right[
+* `x`: A vector of discrete design variables (not used here).
+
+* `a`: A vector of covariates.
+
+* `bpop`: A vector of fixed effect parameters (i.e., `THETA`s).
+
+* `b`: A vector of individual IIV random effects (i.e., `ETA`s).
+
+* `bocc`: A vector of individual IOV random effects (i.e., `ETA`s) (not used here).
+
+In this example, we include IIV on `CL`, `V`, and `KA`, and pass through dose, tau, and body weight as covariates.
+]
+
+???
+
+Next is the parameter model, where we add IIV and/or IOV.  Again, there are several arguments that `PopED` expects:
+
+* `x`: A vector of discrete design variables (not used here).
+* `a`: A vector of covariates. Note that dose and dosing interval are also passed in as covariates, in addition to what we'd normally classify as covariates in a PK/PD model.
+* `bpop`: A vector of fixed effect parameters (i.e., `THETA`s).
+* `b`: A vector of individual IIV random effects (i.e., `ETA`s).
+* `bocc`: A vector of individual IOV random effects (i.e., `ETA`s) (not used here).
+
+In this example, we include IIV on `CL`, `V`, and `KA`, and pass through dose, tau, and body weight as covariates.
 
 ---
 
-# `feps()`
+# `feps()`: the residual error model
 
-Finally, we define the residual error model structure.  We're using one of the built-in functions, but suppose instead we wanted a log-normal residual error model (i.e., additive on the log scale). We would need to define a custom function for this as well.  The setup is a bit esoteric, so we would just start with one of the built-in functions and tweak as necessary.  There's only one new argument here:
-
-* `epsi`: A matrix of residual random effects (i.e. `EPS`s or `ERR`s).
-
+.pull-left-60[
 ```{r}
 feps <- function(model_switch, xt, parameters, epsi, poped.db){
   returnArgs <- do.call(
@@ -778,12 +823,21 @@ feps <- function(model_switch, xt, parameters, epsi, poped.db){
   return(list(y = y, poped.db = poped.db)) 
 }
 ```
+]
+
+.pull-right-40[
+* `epsi`: A matrix of residual random effects (i.e. `EPS`s or `ERR`s).
+]
+
+???
+
+Finally, we define the residual error model structure.  We're using one of the built-in functions, but suppose instead we wanted a log-normal residual error model (i.e., additive on the log scale). We would need to define a custom function for this as well.  The setup is a bit esoteric, so we would just start with one of the built-in functions and tweak as necessary.  There's only one new argument here:
+
+* `epsi`: A matrix of residual random effects (i.e. `EPS`s or `ERR`s).
 
 ---
 
 # `create.poped.database()`
-
-Now that we have our model defined, we bring it all together with details of the design.  There's a lot going on here even for this simple example (the documentation is 13 pages long for this function alone), so we'll break this down into pieces.
 
 ```{r}
 poped_db <- create.poped.database(
@@ -804,61 +858,192 @@ poped_db <- create.poped.database(
 )
 ```
 
+???
+
+Now that we have our model defined, we bring it all together with details of the design.  There's a lot going on here even for this simple example (the documentation is 13 pages long for this function alone), so we'll break this down into pieces.
+
 We've covered the functions used in the first 3 arguments.  Let's break down the rest.
 
+---
+
+# `create.poped.database()`
+
+.pull-left-60[
 ```{r eval=FALSE}
+poped_db <- create.poped.database(
+  ff_fun = ff,  #<<
+  fg_fun = fg,  #<<
+  fError_fun = feps.add.prop,  #<<
   bpop = c(CL = 10, V = 100, KA = 0.25, WT_CL = 0.75, WT_V = 1), 
-```
-
-These are our current best estimates of the fixed effect parameters (`THETA`s).
-
-```{r eval=FALSE}
   notfixed_bpop = c(1, 1, 1, 0, 0),
+  d = c(CL = 0.08, V = 0.1, KA = 0.2), 
+  sigma = c(0.05, 1),
+  m = 1,
+  groupsize = 12,
+  xt = c(5, c(rep(24, 3), 168)),
+  minxt = c(0, c(rep(23, 3), 96)),
+  maxxt = c(6, c(rep(24, 3), 168)),
+  model_switch = c(1, rep(2, 4)),
+  a = cbind(DOSE = 10, TAU = 24, WT = 32)
+)
 ```
+]
+
+.pull-right-40[
+* `ff_fun`, `fg_fun`, `fError_fun`: Model functions
+]
+
+---
+
+# `create.poped.database()`
+
+.pull-left-60[
+```{r eval=FALSE}
+poped_db <- create.poped.database(
+  ff_fun = ff,
+  fg_fun = fg,
+  fError_fun = feps.add.prop,
+  bpop = c(CL = 10, V = 100, KA = 0.25, WT_CL = 0.75, WT_V = 1),   #<<
+  notfixed_bpop = c(1, 1, 1, 0, 0),  #<<
+  d = c(CL = 0.08, V = 0.1, KA = 0.2),  #<<
+  sigma = c(0.05, 1),  #<<
+  m = 1,
+  groupsize = 12,
+  xt = c(5, c(rep(24, 3), 168)),
+  minxt = c(0, c(rep(23, 3), 96)),
+  maxxt = c(6, c(rep(24, 3), 168)),
+  model_switch = c(1, rep(2, 4)),
+  a = cbind(DOSE = 10, TAU = 24, WT = 32)
+)
+```
+]
+
+.pull-right-40[
+* `bpop`: our current best estimates of the fixed effect parameters (`THETA`s)
+
+* `notfixed_bpop`: whether or not they're being estimated
+
+* `d`: diagonal elements of the IIV covariance matrix (`OMEGA`)
+
+* `sigma`: diagonal elements of the residual covariance matrix (`SIGMA`)
+]
+
+???
 
 For this example, we're assuming that our weight covariate parameters are fixed in the model.  We need to tell `PopED` they're not not fixed (yes, that's a double negative).  Each element of this vector corresponds to an element of `bpop`.  We use `1` to denote "not fixed" (estimated) and `0` to denote "not not fixed" (not estimated).
 
-```{r eval=FALSE}
-  d = c(CL = 0.08, V = 0.1, KA = 0.2), 
-```
-
 These are the diagonal elements of the IIV covariance matrix (`OMEGA`).  `covd` could be used for off-diagonal elements, but we're assuming those are all zero here.
-
-```{r eval=FALSE}
-  sigma = c(0.05, 1),
-```
 
 Diagonal elements of the residual covariance matrix.
 
+---
+
+# `create.poped.database()`
+
+.pull-left-60[
 ```{r eval=FALSE}
-  m = 1,
-  groupsize = 12,
+poped_db <- create.poped.database(
+  ff_fun = ff,
+  fg_fun = fg,
+  fError_fun = feps.add.prop,
+  bpop = c(CL = 10, V = 100, KA = 0.25, WT_CL = 0.75, WT_V = 1),
+  notfixed_bpop = c(1, 1, 1, 0, 0),
+  d = c(CL = 0.08, V = 0.1, KA = 0.2),
+  sigma = c(0.05, 1),
+  m = 1,  #<<
+  groupsize = 12,  #<<
+  xt = c(5, c(rep(24, 3), 168)),
+  minxt = c(0, c(rep(23, 3), 96)),
+  maxxt = c(6, c(rep(24, 3), 168)),
+  model_switch = c(1, rep(2, 4)),
+  a = cbind(DOSE = 10, TAU = 24, WT = 32)
+)
 ```
+]
+
+.pull-right-40[
+* `m`: number of groups
+
+* `groupsize`:  number of subjects in each group
+]
+
+???
 
 `m` is the number of groups, with `groupsize` subjects in each group.  We could use multiple groups to define multiple arms of a study, or to assign different designs to different subjects.
 
+---
+
+# `create.poped.database()`
+
+.pull-left-60[
 ```{r eval=FALSE}
-  xt = c(5, c(rep(24, 3), 168)),
+poped_db <- create.poped.database(
+  ff_fun = ff,
+  fg_fun = fg,
+  fError_fun = feps.add.prop,
+  bpop = c(CL = 10, V = 100, KA = 0.25, WT_CL = 0.75, WT_V = 1),
+  notfixed_bpop = c(1, 1, 1, 0, 0),
+  d = c(CL = 0.08, V = 0.1, KA = 0.2),
+  sigma = c(0.05, 1),
+  m = 1,
+  groupsize = 12,
+  xt = c(5, c(rep(24, 3), 168)),  #<<
+  minxt = c(0, c(rep(23, 3), 96)),  #<<
+  maxxt = c(6, c(rep(24, 3), 168)),  #<<
+  model_switch = c(1, rep(2, 4)),  #<<
+  a = cbind(DOSE = 10, TAU = 24, WT = 32)
+)
 ```
+]
+
+.pull-right-40[
+* `xt`: initial sampling design
+
+* `minxt`: lower bound
+* `maxxt`: lower bound
+
+* `model_switch`: associate sampling times with model
+]
+
+???
+
 
 Our initial sampling design.
 
-```{r eval=FALSE}
-  minxt = c(0, c(rep(23, 3), 96)),
-  maxxt = c(6, c(rep(24, 3), 168)),
-```
-
 These define the design space for our sampling times.  When optimizing, potential sampling times will be evaluated between these bounds.
-
-```{r eval=FALSE}
-  model_switch = c(1, rep(2, 4)),
-```
 
 The way we've defined our `ff()` function above, this allows us to signify that the first sampling time is after the first dose (`model_switch == 1`), and the remaining 4 samples are at steady state (`model_switch == 2`).
 
+---
+
+# `create.poped.database()`
+
+.pull-left-60[
 ```{r eval=FALSE}
-  a = cbind(DOSE = 10, TAU = 24, WT = 32)
+poped_db <- create.poped.database(
+  ff_fun = ff,
+  fg_fun = fg,
+  fError_fun = feps.add.prop,
+  bpop = c(CL = 10, V = 100, KA = 0.25, WT_CL = 0.75, WT_V = 1),
+  notfixed_bpop = c(1, 1, 1, 0, 0),
+  d = c(CL = 0.08, V = 0.1, KA = 0.2),
+  sigma = c(0.05, 1),
+  m = 1,
+  groupsize = 12,
+  xt = c(5, c(rep(24, 3), 168)),
+  minxt = c(0, c(rep(23, 3), 96)),
+  maxxt = c(6, c(rep(24, 3), 168)),
+  model_switch = c(1, rep(2, 4)),
+  a = cbind(DOSE = 10, TAU = 24, WT = 32)  #<<
+)
 ```
+]
+
+.pull-right-40[
+* `a`: covariates
+]
+
+???
 
 The "covariates" in our model.  Note that we're using a single body weight here to keep things simple, but we could [use a distribution if necessary](https://cran.r-project.org/web/packages/PopED/vignettes/examples.html#distribution-of-covariates).
 
@@ -866,9 +1051,8 @@ The "covariates" in our model.  Note that we're using a single body weight here 
 
 # Test plot
 
-`PopED` includes a function to generate a quick test plot showing the typical response(s), along with the initial sampling times.
-
-```{r}
+.pull-left[
+```{r test-plot-1, fig.show="hide", fig.width=4, fig.height=4}
 plot_model_prediction(
   poped_db,
   model.names = c("Day 1", "Steady state"),
@@ -878,6 +1062,15 @@ plot_model_prediction(
   labs(x = "Time from dose (h)") +
   theme_bw()
 ```
+]
+
+.pull-right[
+![](`r knitr::fig_chunk("test-plot-1", "png")`)
+]
+
+???
+
+`PopED` includes a function to generate a quick test plot showing the typical response(s), along with the initial sampling times.
 
 ---
 
@@ -888,30 +1081,27 @@ FIM <- evaluate.fim(poped_db)
 det(FIM)
 ```
 
-This determinant is what will be used to optimize the design, but it's not particularly helpful by itself.  What we really need are the predicted standard errors based on the FIM.
-
 ```{r}
 get_rse(FIM, poped_db)
 ```
 
-The RSEs are crazy high, which suggests that the model is not identifiable.  A slight tweak to a single timepoint (increasing the number of support points) may help.
-
 ```{r}
-poped_db2 <- create.poped.database(
-  poped_db,
-  xt = c(5, c(23, 24, 24, 168))
-)
+poped_db2 <- create.poped.database( poped_db, xt = c(5, c(23, 24, 24, 168)) )
 FIM2 <- evaluate.fim(poped_db2) 
 get_rse(FIM2, poped_db2)
 ```
+
+???
+
+This determinant is what will be used to optimize the design, but it's not particularly helpful by itself.  What we really need are the predicted standard errors based on the FIM.
+
+The RSEs are crazy high, which suggests that the model is not identifiable.  A slight tweak to a single timepoint (increasing the number of support points) may help.
 
 The RSEs are no longer in the millions, but certainly not as low as we'd hope for. Let's see if we can make any improvements with optimization.
 
 ---
 
-# *D*-optimal design
-
-## Starting from the original design
+# *D*-optimal design: Starting from the original design
 
 ```{r}
 output <- readRDS("../script/opt1.rds")
@@ -922,9 +1112,7 @@ Better, but still not good enough.
 
 ---
 
-# *D*-optimal design
-
-## Adding another post dose sample at steady state
+# *D*-optimal design: Add another post dose sample at SS
 
 Add another post dose sample at steady state.
 
@@ -961,9 +1149,7 @@ summary(output_extra_ss)
 
 ---
 
-# *D*-optimal design
-
-## Adding sample after the final (steady-state) dose
+# *D*-optimal design: Add sample after the final (SS) dose
 
 Add another sample after the final dose.
 
@@ -1049,6 +1235,15 @@ class: inverse, center, middle
 
 ---
 
+# Software resources
+
+* `PopED`: https://andrewhooker.github.io/PopED/
+* `mrgsolve`: https://mrgsolve.github.io/
+* `babylon`: https://github.com/metrumresearchgroup/babylon
+  + `rbabylon`: https://metrumresearchgroup.github.io/rbabylon/
+
+---
+
 # References
 
 ```{r refs, echo=FALSE, results="asis"}
@@ -1057,8 +1252,6 @@ PrintBibliography(myBib)
 
 ---
 
-https://www.flickr.com/photos/hyperxp/6847495120
-https://www.flickr.com/photos/dmuth/6039404494
 https://www.flickr.com/photos/dmuth/6039404304
 
 https://www.flickr.com/photos/dok1/3581901453
