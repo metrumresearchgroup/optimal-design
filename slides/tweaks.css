@@ -25,9 +25,12 @@
 
 
 .poll-slide {
-  background: linear-gradient(132deg, #ec5218, #1665c1);
-  background-size: 400% 400%;
-  animation: BackgroundGradient 10s ease infinite;
+  background: rgb(0,114,182);
+  background: linear-gradient(157deg, rgba(35,107,150,1) 0%, rgba(40,136,69,1) 68%, rgba(179,40,25,1) 100%);
+  /* background: linear-gradient(132deg, #ec5218, #1665c1); */
+  /* background-size: 400% 400%; */
+  /* animation: BackgroundGradient 10s ease infinite; */
+  /* transform: translateZ(0); */
   color: #fff;
 }
 
@@ -35,8 +38,10 @@
   text-align: center;
 }
 
+/*
 @keyframes BackgroundGradient {
   0% {background-position: 0% 50%;}
   50% {background-position: 100% 50%;}
   100% {background-position: 0% 50%;}
 }
+*/
