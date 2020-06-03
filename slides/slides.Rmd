@@ -23,7 +23,9 @@ knitr:::opts_chunk$set(
 )
 library(tidyverse)
 library(PopED)
+library(mrgsolve)
 library(glue)
+theme_set(theme_bw())
 ```
 
 ```{r, load_refs, include=FALSE, cache=FALSE}
@@ -97,6 +99,13 @@ background-size: cover
 
 * Software tools
 
+* Simple model with `PopED`
+    + Evaluation
+    + Optimization
+    + Simulation
+
+* More complex models with `PopED` and `mrgsolve`
+
 ???
 
 Image credit: [Flickr](https://www.flickr.com/photos/davidden/70342823/)
@@ -117,7 +126,7 @@ class: poll-slide
 
 --
 
-3. I've seen it around, but it seems kinda fishy.
+3. I've seen it around, but it seems kinda dodgy.
 
 --
 
@@ -586,6 +595,8 @@ designs <- bind_cols(
 
 4. `r designs %>% dplyr::filter(design == "Design 4") %>% pull(xt)` hours
 
+5. Sorry, my kid just came looking for snacks.
+
 $t_\textrm{max} \approx$ 6 hours
 ]
 
@@ -1049,7 +1060,7 @@ The "covariates" in our model.  Note that we're using a single body weight here 
 
 ---
 
-# Test plot
+# Plot of initial design
 
 .pull-left[
 ```{r test-plot-1, fig.show="hide", fig.width=4, fig.height=4}
@@ -1103,20 +1114,36 @@ The RSEs are no longer in the millions, but certainly not as low as we'd hope fo
 
 # *D*-optimal design: Starting from the original design
 
-```{r}
+.pull-left-40[
+```{r eval=FALSE}
+output <- poped_optim(
+  poped_db,
+  opt_xt = TRUE,
+  parallel = TRUE,
+  parallel_type = "multicore",
+  seed = 1
+)
+summary(output)
+```
+]
+
+.pull-right-60[
+.font-90[
+```{r echo=FALSE}
 output <- readRDS("../script/opt1.rds")
 summary(output)
 ```
+]
+]
+
+
+???
 
 Better, but still not good enough.
 
 ---
 
-# *D*-optimal design: Add another post dose sample at SS
-
-Add another post dose sample at steady state.
-
-We'll create the PopED database from scratch again.  This is probably easier than updating an old database when you change the number of samples because certain vectors (like `grouped_xt`) are generated automatically if you don't supply the argument and we don't want to fuss with that.
+# Add another post dose sample at SS
 
 ```{r}
 poped_db_extra_ss <- create.poped.database(
@@ -1129,31 +1156,57 @@ poped_db_extra_ss <- create.poped.database(
   sigma = c(0.05, 1),
   m = 1,
   groupsize = 12,
-  xt = c(5, c(rep(24, 3), 4, 168)),
-  minxt = c(0, c(rep(23, 3), 0, 96)),
-  maxxt = c(6, c(rep(24, 3), 6, 168)),
-  model_switch = c(1, rep(2, 5)),
+  xt = c(5, c(rep(24, 3), 4, 168)),  #<<
+  minxt = c(0, c(rep(23, 3), 0, 96)),  #<<
+  maxxt = c(6, c(rep(24, 3), 6, 168)),  #<<
+  model_switch = c(1, rep(2, 5)),  #<<
   a = cbind(DOSE = 10, TAU = 24, WT = 32)
 )
 ```
+
+???
+
+Add another post dose sample at steady state.
+
+We'll create the PopED database from scratch again.  This is probably easier than updating an old database when you change the number of samples because certain vectors (like `grouped_xt`) are generated automatically if you don't supply the argument and we don't want to fuss with that.
+
+---
+
+# Add another post dose sample at SS
 
 ```{r}
 FIM_extra_ss <- evaluate.fim(poped_db_extra_ss) 
 get_rse(FIM_extra_ss, poped_db_extra_ss)
 ```
 
-```{r}
+---
+
+# *D*-optimal design: Add another post dose sample at SS
+
+.pull-left-40[
+```{r ,eval=FALSE}
+output_extra_ss <- poped_optim(
+  poped_db_extra_ss,
+  opt_xt = TRUE,
+  parallel = TRUE,
+  parallel_type = "multicore",
+  seed = 1
+)
+summary(output_extra_ss)
+```
+]
+
+.pull-right-60[
+.font-90[
+```{r echo=FALSE}
 output_extra_ss <- readRDS("../script/opt2.rds")
 summary(output_extra_ss)
 ```
+]]
 
 ---
 
-# *D*-optimal design: Add sample after the final (SS) dose
-
-Add another sample after the final dose.
-
-This time we can just update the previous PopED database.
+# Add sample after the final (SS) dose
 
 ```{r}
 poped_db_final <- create.poped.database(
@@ -1169,16 +1222,40 @@ FIM_final <- evaluate.fim(poped_db_final)
 get_rse(FIM_final, poped_db_final)
 ```
 
-```{r}
+???
+
+Add another sample after the final dose.
+
+This time we can just update the previous PopED database.
+
+---
+
+# *D*-optimal design: Add sample after the final (SS) dose
+
+.pull-left-40[
+```{r eval=FALSE}
+output_final <- poped_optim(
+  poped_db_final,
+  opt_xt = TRUE,
+  parallel = TRUE,
+  parallel_type = "multicore",
+  seed = 1
+)
+summary(output_final)
+```
+]
+
+.pull-right-60[
+.font-90[
+```{r echo=FALSE}
 output_final <- readRDS("../script/opt3.rds")
 summary(output_final)
 ```
+]]
 
 ---
 
 # Near-optimal design
-
-This optimal design serves us well, but it's not very practical to request a sample at 41.09 hours after the final dose.  For a dose at 8 AM, that would mean a sample at around 1 AM.  Instead we'll construct a similar design with more practical times and see how that affects our RSEs.  We can do this by building a new `PopED` database based on the previous one.
 
 ```{r}
 poped_db_practical <- create.poped.database(
@@ -1187,6 +1264,18 @@ poped_db_practical <- create.poped.database(
 )
 FIM_practical <- evaluate.fim(poped_db_practical) 
 get_rse(FIM_practical, poped_db_practical)
+```
+
+???
+
+This optimal design serves us well, but it's not very practical to request a sample at 41.09 hours after the final dose.  For a dose at 8 AM, that would mean a sample at around 1 AM.  Instead we'll construct a similar design with more practical times and see how that affects our RSEs.  We can do this by building a new `PopED` database based on the previous one.
+
+This second-to-last sample at 32 hours would be at 4 PM the day after an 8 AM final dose.  More practical, and we don't seem to lose too much in terms of RSE.
+
+---
+
+.pull-left[
+```{r test-plot-2, fig.show="hide", fig.width=4, fig.height=4}
 plot_model_prediction(
   poped_db_practical,
   model.names = c("Day 1", "Steady state"),
@@ -1196,12 +1285,31 @@ plot_model_prediction(
   labs(x = "Time from dose (h)") +
   theme_bw()
 ```
+]
 
-This second-to-last sample at 32 hours would be at 4 PM the day after an 8 AM final dose.  More practical, and we don't seem to lose too much in terms of RSE.
+.pull-right[
+![](`r knitr::fig_chunk("test-plot-2", "png")`)
+]
 
 ---
 
 # Sampling windows
+
+.pull-left[
+```{r test-plot-3, fig.show="hide", fig.width=5, fig.height=5}
+plot_efficiency_of_windows(
+  poped_db_practical,
+  xt_plus  = c(0.25, rep(0, 3), 2, 0),
+  xt_minus = c(0.25, rep(1, 3), 2, 4)
+)
+```
+]
+
+.pull-right[
+![](`r knitr::fig_chunk("test-plot-3", "png")`)
+]
+
+???
 
 Next, we'll construct windows around our sampling times to provide some flexibility in sampling.  We evaluate the effect of this flexibility on the RSEs.
 
@@ -1212,15 +1320,126 @@ We'll allow:
 * up to 2 hours before or after the 32-hour sample after the final dose (i.e., 30-34 hours after the final dose)
 * up to 4 hours before the final sample (i.e., 164-168 hours post final dose)
 
-```{r}
-plot_efficiency_of_windows(
-  poped_db_practical,
-  xt_plus  = c(0.25, rep(0, 3), 2, 0),
-  xt_minus = c(0.25, rep(1, 3), 2, 4)
-)
+The 100 sets of simulated samples show no significant deviations from the RSEs for the optimal samples.
+
+---
+
+# SSE: Stochastic Simulation and Estimation
+
+.center[
+```{r echo=F, out.width='65%'}
+knitr::include_graphics("pics/sse.svg")
+```
+]
+
+---
+
+# SSE: `template.csv`
+
+```
+$PROB RUN# run_num
+
+$INPUT ID TIME EVID MDV CMT AMT SS II DV WT
+
+$DATA data_fname IGNORE=@
+
+...
+
+$SIMULATION (run_num)
+$ESTIMATION METHOD=1 INTER PRINT=1 MSFO=./run_num.msf
 ```
 
-The 100 sets of simulated samples show no significant deviations from the RSEs for the optimal samples.
+---
+
+# SSE: Run the models with `rbabylon`
+
+```{r eval=FALSE}
+run_model <- function(.design_dir, .run_num) {
+  # Modify and write the control stream
+  ctl_template %>% 
+    str_replace("run_num", as.character(.run_num)) %>% 
+    str_replace("data_fname", paste0("../", .run_num, ".csv")) %>% 
+    writeLines(file.path(.design_dir, paste0(.run_num, ".ctl")))
+  
+  # Run the model
+  new_model( #<<
+    .yaml_path = file.path(.design_dir, paste0(.run_num, ".yaml")), #<<
+    .description = .run_num #<<
+  ) %>% #<<
+    submit_model() #<<
+}
+```
+
+---
+
+# SSE: Collect the results with `rbabylon`
+
+```{r eval=FALSE}
+get_est <- function(.design_dir) {
+  est <- map_dfr(seq_len(n_rep), function(.run_num) {
+    mod <- read_model(file.path(.design_dir, paste0(.run_num, ".yaml"))) #<<
+    mod_sum <- try(mod %>% model_summary(), silent = TRUE) #<<
+    if (inherits(mod_sum, "try-error")) return(NULL)
+    mod_sum %>% 
+      param_estimates() %>% 
+      filter(fixed == 0) %>% 
+      select(param = names, estimate) %>% 
+      mutate(rep = .run_num)
+  }) %>% 
+    left_join(true_vals) %>% 
+    mutate(
+      param = factor(param, levels = unique(.[["param"]])),
+      pct_bias = (estimate - value) / abs(value) * 100
+    ) %>% 
+    filter(abs(pct_bias) < 5000)
+  return(est)
+}
+```
+
+---
+
+# SSE: Results for our example
+
+.pull-left[
+```{r echo=FALSE, fig.height=4, fig.width=4, out.width='100%'}
+plot_est <- function(.est) {
+  .est %>% 
+    mutate(type = substr(param, 1, 5)) %>% 
+    ggplot(aes(param, pct_bias, fill = type)) +
+    geom_boxplot() +
+    labs(x = NULL, y = "Relative Bias (%)") +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+sum_est <- function(.est) {
+  output <- .est %>% 
+    group_by(param) %>% 
+    summarise(
+      sim_pct_rse = sd(estimate) / abs(first(value)) * 100,
+      sim_pct_bias = mean(pct_bias)
+    )
+  n_success <- n_distinct(.est$rep)
+  
+  return(output)
+}
+est <- readRDS("../script/ex1_est2.rds")
+plot_est(est)
+```
+]
+
+.pull-right[
+.font-90[
+```{r message=TRUE,echo=FALSE}
+sum_est(est) %>% 
+  mutate(poped_pct_rse = get_rse(evaluate.fim(poped_db_practical),
+                                 poped_db_practical)) %>% 
+  select(param, poped_pct_rse, everything()) %>% 
+  mutate_if(is.numeric, round, 1) %>% 
+  knitr::kable(format = "html")
+```
+]]
 
 ---
 
@@ -1229,18 +1448,321 @@ class: inverse, center, middle
 # Example: ODE PK model
 
 ---
+
+# Study design and model
+
+.pull-left[
+Fakinumab is being studied in humans for the first time.
+
+* Single IV bolus doses of fakinumab: 0.03, 0.1, 0.3, 1, 3, and 10 mg.
+* 6 subjects per dose group will be on active drug.
+* Proposed samples: 1 and 4 hours post dose, and 1, 3, 7, 14, 21 days post dose.
+]
+
+.pull-right[
+Based on projections from animal PK data, we predict that a 2-compartment model with linear and nonlinear (Michaelis-Menten) clearance from the central compartment will desribe the data.
+
+```{r echo=FALSE}
+tibble(
+  CL = 0.5, VMAX = 20, KM = 1.2, V1 = 2.5, Q = 10, V2 = 4
+) %>% 
+  knitr::kable(format = "html")
+```
+
+We include log-normal IIV on `CL`, `VMAX`, and `V1`, and a proportional residual error.
+
+```{r echo=FALSE}
+tibble(
+  om_CL = 0.2, om_VMAX = 0.2, om_V1 = 0.1, sigma_prop = 0.15
+) %>% 
+  knitr::kable(format = "html")
+```
+]
+
+---
+
+# Model in `mrgsolve`
+
+```{r echo=FALSE}
+mod <- mread(file.path("../script/model", "model_poped"))
+see(mod)
+```
+
+---
+
+# `ff()` for `mrgsolve` model
+
+.pull-left[
+.font-80[
+```{r eval=FALSE}
+ff <- function(model_switch, xt, parameters, poped.db) {
+  obs_time <- as.numeric(xt)
+  dose_time <- 0
+  
+  dose <- data.frame(
+    ID = 1, 
+    amt = parameters[["DOSE"]]*1000,
+    cmt = 1, 
+    evid = 1,
+    time = dose_time
+  )
+  obs <- data.frame(
+    ID = 1, 
+    amt = 0, 
+    cmt = 1, 
+    evid = 0, 
+    time = sort(obs_time)
+  )
+```
+]]
+
+.pull-right[
+.font-80[
+```{r eval=FALSE}
+  
+  data <- arrange(bind_rows(dose,obs),time)
+
+  mod <- param(mod, parameters)
+  
+  out <- mrgsim_q(mod,data,output="matrix")
+  
+  out <- out[data$evid==0,"CP",drop=FALSE][match(obs_time,obs$time),]
+  
+  return(list(y = out, poped.db = poped.db))
+}
+```
+]]
+
+---
+
+# Plot of initial design
+
+```{r echo=FALSE}
+ff <- function(model_switch, xt, parameters, poped.db) {
+  
+  obs_time <- as.numeric(xt)
+  dose_time <- 0
+  
+  dose <- data.frame(
+    ID = 1, 
+    amt = parameters[["DOSE"]]*1000,
+    cmt = 1, 
+    evid = 1,
+    time = dose_time
+  )
+  
+  obs <- data.frame(
+    ID = 1, 
+    amt = 0, 
+    cmt = 1, 
+    evid = 0, 
+    time = sort(obs_time)
+  )
+  
+  data <- arrange(bind_rows(dose,obs),time)
+  
+  mod <- param(mod, parameters)
+  
+  out <- mrgsim_q(mod,data,output="matrix")
+  
+  out <- out[data$evid==0,"CP",drop=FALSE][match(obs_time,obs$time),]
+  
+  return(list(y = out, poped.db = poped.db))
+}
+
+fg <- function(x, a, bpop, b, bocc){
+  parameters = c(
+    CL    = bpop[1] * exp(b[1]),
+    VMAX  = bpop[2] * exp(b[2]),
+    KM    = bpop[3],
+    V1    = bpop[4] * exp(b[3]),
+    Q     = bpop[5],
+    V2    = bpop[6],
+    DOSE  = a[1] 
+  )
+  return(parameters) 
+}
+
+poped_db_mrg <- create.poped.database(
+  ff_fun = ff,
+  fg_fun = fg,
+  fError_fun = feps.prop,
+  bpop = c(CL = 0.5, VMAX = 20, KM = 1.2, V1 = 2.5, Q = 10, V2 = 4), 
+  notfixed_bpop = c(1, 1, 1, 1, 1, 1),
+  d = c(CL = 0.2, VMAX = 0.2, V1 = 0.1),
+  sigma = c(0.15),
+  m = 6,
+  groupsize = 6,
+  xt = c(c(1, 4)/24, 1, 3, 7, 14, 21),
+  minxt = 0,
+  maxxt = 21,
+  bUseGrouped_xt = TRUE,
+  a = cbind(DOSE = c(0.03, 0.1, 0.3, 1, 3, 10))
+)
+```
+
+.center[
+```{r echo=FALSE, fig.width=7, fig.height=4, out.width='80%'}
+plot_model_prediction(
+  poped_db_mrg,
+  model_num_points = 200
+) +
+  labs(x = "Time from dose (days)") +
+  scale_y_log10(lim = c(0.01, 1e4))
+```
+]
+
+---
+
+# Evaluate FIM
+
+```{r}
+FIM_mrg <- evaluate.fim(poped_db_mrg) 
+get_rse(FIM_mrg, poped_db_mrg)
+```
+
+---
+
+# Sampling windows
+
+.pull-left[
+```{r eval=FALSE}
+plot_efficiency_of_windows(
+  poped_db_mrg,
+  xt_plus  = c(rep(1/24, 2), rep(3/24, 5)),
+  xt_minus = c(rep(1/24, 2), rep(3/24, 5))
+)
+```
+]
+
+.pull-right[
+```{r fig.width=5, fig.height=5, out.width='100%', echo=FALSE}
+p <- readRDS("../script/windows_mrg.rds")
+p
+```
+]
+
+???
+
+We'll allow:
+
+* 1 hour before or after samples on Day 1
+* 3 hours before or after other sampling times
+
+Again, the 100 sets of simulated samples show no significant deviations from the RSEs for the original samples, so we're golden.
+
+
+---
+
+# SSE results
+
+.pull-left[
+```{r echo=FALSE, fig.height=4, fig.width=4, out.width='100%'}
+est <- readRDS("../script/ex2_est1.rds")
+plot_est(est)
+```
+]
+
+.pull-right[
+.font-90[
+```{r message=TRUE,echo=FALSE}
+sum_est(est) %>% 
+  mutate(poped_pct_rse = get_rse(evaluate.fim(poped_db_mrg),
+                                 poped_db_mrg)) %>% 
+  select(param, poped_pct_rse, everything()) %>% 
+  mutate_if(is.numeric, round, 1) %>% 
+  knitr::kable(format = "html")
+```
+]]
+
+---
+
 class: inverse, center, middle
 
 # Example: ODE PK/PD model
 
 ---
 
+class: inverse, center, middle
+
+# Example: Wrap up
+
+---
+
+background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/1293/645438825_1039d343a0_k_d.jpg)
+background-size: cover
+  
+# What did we learn today?
+
+.pull-left[
+* Optimal design can be a useful tool
+{{content}}
+]
+
+--
+
+* Always run confirmatory simulations
+{{content}}
+
+???
+
+Image credit: [Flickr](https://www.flickr.com/photos/flex/645438825/)
+
+---
+
+background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/5614/15348032367_c571131bb9_k_d.jpg)
+background-size: cover
+  
+# What did we miss?
+
+.pull-left[
+* Dealing with parameter uncertainty (e.g., $ED$-, $HC\textrm{ln}D$-optimality)
+{{content}}
+]
+
+--
+
+* Dealing with model uncertainty (e.g. $T$-optimality)
+{{content}}
+
+--
+
+* Ignoring unimportant parameters (e.g. $D_S$-, $G$-optimality)
+{{content}}
+
+--
+
+* Basically an alphabet of other criteria: $A$-, $C$-, $G$-, $V$-optimality, etc.
+{{content}}
+
+--
+
+* Almost all of `PopED`'s options
+{{content}}
+
+???
+
+Image credit: [Flickr](https://www.flickr.com/photos/traveloriented/15348032367/)
+
+---
+
+background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/6077/6039404304_db836ce6d8_k_d.jpg)
+background-size: cover
+  
 # Software resources
 
+.pull-left[
 * `PopED`: https://andrewhooker.github.io/PopED/
+
 * `mrgsolve`: https://mrgsolve.github.io/
+
 * `babylon`: https://github.com/metrumresearchgroup/babylon
   + `rbabylon`: https://metrumresearchgroup.github.io/rbabylon/
+]
+
+???
+
+Image credit: [Flickr](https://www.flickr.com/photos/dmuth/6039404304)
 
 ---
 
@@ -1252,7 +1774,6 @@ PrintBibliography(myBib)
 
 ---
 
-https://www.flickr.com/photos/dmuth/6039404304
 
 https://www.flickr.com/photos/dok1/3581901453
 https://www.flickr.com/photos/bucky1105/2334669404

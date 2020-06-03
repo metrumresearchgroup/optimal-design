@@ -23,6 +23,14 @@
   background-image: url("pics/Logo_M.png");
 }
 
+.font-60 { font-size: 60% }
+.font-70 { font-size: 70% }
+.font-80 { font-size: 80% }
+.font-90 { font-size: 90% }
+.font-60 .remark-code { font-size: 60% }
+.font-70 .remark-code { font-size: 70% }
+.font-80 .remark-code { font-size: 80% }
+.font-90 .remark-code { font-size: 90% }
 
 .poll-slide {
   background: rgb(0,114,182);
@@ -36,6 +44,10 @@
 
 .poll-slide h1, h2 {
   text-align: center;
+}
+
+.poll-slide h2 {
+  font-size: 180%;
 }
 
 /*
@@ -57,3 +69,24 @@
 .pull-right-40 ~ * {
   clear: both;
 }
+
+.pull-left-40 {
+  float: left;
+  width: 37%;
+}
+.pull-right-60 {
+  float: right;
+  width: 57%;
+}
+.pull-right-60 ~ * {
+  clear: both;
+}
+.pull-right-60-small {
+  float: right;
+  width: 57%;
+  font-size: 70%;
+}
+.pull-right-60-small ~ * {
+  clear: both;
+}
+
