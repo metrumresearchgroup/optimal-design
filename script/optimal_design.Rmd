@@ -882,8 +882,10 @@ poped_db_gcsf <- create.poped.database(
   #minxt = 0,
   #maxxt = 10*24,
   bUseGrouped_xt = TRUE,
-  a = cbind(DOSE = c(2.5, 5, 10), WT = 75, TAU = 24),
-  discrete_a = list(DOSE = c(0.1, 0.3, 1, 2.5, 5, 10, 30), WT = 75, TAU = 24)
+  a = cbind(DOSE = c(1, 3, 10), WT = 75, TAU = 24),
+  #discrete_a = list(DOSE = c(0.1, 0.3, 1, 2.5, 5, 10, 30), WT = 75, TAU = 24)
+  discrete_a = list(DOSE = c(0.1, 0.3, 1, 3, 10, 30), WT = 75, TAU = 24)
+  #discrete_a = list(DOSE = c(2.5, 5, 10), WT = 75, TAU = 24)
   #a = cbind(DOSE = c(1, 3, 5)*75, TAU = 24)
   #a = cbind(DOSE = c(0.1, 0.3, 1)*75, TAU = 24)
   #a = cbind(DOSE = c(3, 10, 30)*75, TAU = 24)
@@ -909,8 +911,13 @@ plot_model_prediction(
 
 ## Evaluate FIM
 
-```{r}
+```{r eval=FALSE}
 system.time(FIM_gcsf <- evaluate.fim(poped_db_gcsf))
+saveRDS(FIM_gcsf, "FIM_gcsf.rds")
+```
+
+```{r}
+FIM_gcsf <- readRDS("FIM_gcsf.rds")
 get_rse(FIM_gcsf, poped_db_gcsf)
 ```
 
@@ -920,9 +927,10 @@ get_rse(FIM_gcsf, poped_db_gcsf)
 output_gcsf <- poped_optim(
   poped_db_gcsf,
   opt_a = TRUE,
-  method = "ARS",
+  method = "LS",
   parallel = TRUE,
   parallel_type = "multicore",
+  #num_cores = 2,
   seed = 1
 )
 ```
