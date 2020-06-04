@@ -921,18 +921,33 @@ FIM_gcsf <- readRDS("FIM_gcsf.rds")
 get_rse(FIM_gcsf, poped_db_gcsf)
 ```
 
-## Optimal doses
+## Any better doses?
+
+```{r eval=FALSE}
+designs <- bind_cols(
+  `Design 1` = c(1, 3, 10),
+  `Design 2` = c(0.3, 1, 3),
+  `Design 3` = c(0.3, 1, 10),
+  `Design 4` = c(0.1, 1, 3)
+) %>% 
+  gather("design", "dose")
+
+rse_gcsf <- map_dfr(unique(designs[["design"]]), function(.design) {
+  cat(.design, "\n")
+  doses <- designs %>% filter(design == .design) %>% pull(dose)
+  poped_db_gcsf_tmp <- create.poped.database(
+    poped_db_gcsf,
+    a = cbind(DOSE = doses, WT = 75, TAU = 24)
+  )
+  FIM_gcsf_tmp <- evaluate.fim(poped_db_gcsf_tmp)
+  as.list(get_rse(FIM_gcsf_tmp, poped_db_gcsf_tmp))
+})
+saveRDS(rse_gcsf, "rse_gcsf.rds")
+```
 
 ```{r}
-output_gcsf <- poped_optim(
-  poped_db_gcsf,
-  opt_a = TRUE,
-  method = "LS",
-  parallel = TRUE,
-  parallel_type = "multicore",
-  #num_cores = 2,
-  seed = 1
-)
+rse_gcsf <- readRDS("rse_gcsf.rds")
+bind_cols(design = unique(designs[["design"]]), rse_gcsf)
 ```
 
 # Other resources
