@@ -241,8 +241,18 @@ The most commonly used criterion is the *D*-optimalilty criterion.  *D*-optimal 
 # This is a confidence ellipsoid in 2 dimensions
 
 .center[
-```{r echo=F, out.width='50%'}
-knitr::include_graphics("pics/confidence_ellipsoid.svg")
+```{r echo=FALSE, out.width='65%', fig.width=4, fig.height=3}
+set.seed(1)
+Sigma <- matrix(c(0.3, 0.08, 0.08, 0.2), 2, 2)
+MASS::mvrnorm(
+  n = 100,
+  mu = c(0, 0),
+  Sigma = Sigma
+) %>% 
+  as_tibble() %>% 
+  mutate(CL = 2 * exp(V1), V = 10 * exp(V2)) %>% 
+  ggplot(aes(CL, V)) +
+  stat_ellipse(geom = "polygon", alpha = 0.5, fill = "blue")
 ```
 ]
 
