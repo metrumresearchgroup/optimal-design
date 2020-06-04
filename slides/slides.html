@@ -4,8 +4,8 @@
     <title>A Gentle Introduction to Optimal Design for Pharmacometric Models</title>
     <meta charset="utf-8" />
     <meta name="author" content="Tim Waterhouse and Kyle Baron" />
-    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
-    <link href="libs/remark-css-0.0.1/default-fonts.css" rel="stylesheet" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
     <link rel="stylesheet" href="tweaks.css" type="text/css" />
   </head>
   <body>
@@ -30,6 +30,14 @@ class: title-slide
 layout: true
 
 &lt;div class="my-footer"&gt;&lt;/div&gt;       
+
+&lt;style type="text/css"&gt;
+pre {
+  #background: #FFBB33;
+  max-width: 100%;
+  overflow-x: scroll;
+}
+&lt;/style&gt;
 
 ---
 
@@ -214,7 +222,7 @@ The most commonly used criterion is the *D*-optimalilty criterion.  *D*-optimal 
 # This is a confidence ellipsoid in 2 dimensions
 
 .center[
-&lt;img src="slides_files/figure-html/unnamed-chunk-2-1.png" width="65%" /&gt;
+&lt;img src="slides_files/figure-html/unnamed-chunk-3-1.png" width="65%" /&gt;
 ]
 
 ---
@@ -350,7 +358,7 @@ Image credit: [Flickr](https://www.flickr.com/photos/hyperxp/6847495120)
 # Sampling windows
 
 .pull-left[
-&lt;img src="slides_files/figure-html/unnamed-chunk-4-1.png" width="90%" /&gt;
+&lt;img src="slides_files/figure-html/unnamed-chunk-5-1.png" width="90%" /&gt;
 ]
 
 .pull-right[
@@ -507,7 +515,7 @@ Log-normal IIV on `CL`, `V`, and `KA`; additive &amp; proportional residual erro
 --
 
 .pull-right[
-&lt;img src="slides_files/figure-html/unnamed-chunk-10-1.png" width="90%" /&gt;
+&lt;img src="slides_files/figure-html/unnamed-chunk-11-1.png" width="90%" /&gt;
 ]
 
 ???
@@ -543,7 +551,7 @@ class: poll-slide
 ]
 
 .pull-right[
-&lt;img src="slides_files/figure-html/unnamed-chunk-12-1.png" width="90%" /&gt;
+&lt;img src="slides_files/figure-html/unnamed-chunk-13-1.png" width="90%" /&gt;
 ]
 
 .footnote[[*]According to `PopED`]
@@ -1396,7 +1404,7 @@ get_est &lt;- function(.design_dir) {
 # SSE: Results for our example
 
 .pull-left[
-&lt;img src="slides_files/figure-html/unnamed-chunk-40-1.png" width="100%" /&gt;
+&lt;img src="slides_files/figure-html/unnamed-chunk-41-1.png" width="100%" /&gt;
 ]
 
 .pull-right[
@@ -1610,7 +1618,7 @@ ff &lt;- function(model_switch, xt, parameters, poped.db) {
 
 
 .center[
-&lt;img src="slides_files/figure-html/unnamed-chunk-48-1.png" width="80%" /&gt;
+&lt;img src="slides_files/figure-html/unnamed-chunk-49-1.png" width="80%" /&gt;
 ]
 
 ---
@@ -1644,7 +1652,7 @@ plot_efficiency_of_windows(
 ]
 
 .pull-right[
-&lt;img src="slides_files/figure-html/unnamed-chunk-51-1.png" width="100%" /&gt;
+&lt;img src="slides_files/figure-html/unnamed-chunk-52-1.png" width="100%" /&gt;
 ]
 
 ???
@@ -1662,7 +1670,7 @@ Again, the 100 sets of simulated samples show no significant deviations from the
 # SSE results
 
 .pull-left[
-&lt;img src="slides_files/figure-html/unnamed-chunk-52-1.png" width="100%" /&gt;
+&lt;img src="slides_files/figure-html/unnamed-chunk-53-1.png" width="100%" /&gt;
 ]
 
 .pull-right[
@@ -1753,7 +1761,7 @@ class: inverse, center, middle
 
 .pull-left[
 
-* QD SC doses of filgrastim: 2.5, 5, and 10 &amp;mu;g/kg.
+* QD SC doses of filgrastim: 1, 3, and 10 &amp;mu;g/kg.
 
 * 10 subjects per dose group will be on active drug.
 
@@ -1786,35 +1794,74 @@ class: inverse, center, middle
 # PK and ANC simulations
 
 .center[
-&lt;img src="slides_files/figure-html/unnamed-chunk-56-1.png" width="80%" /&gt;
+&lt;img src="slides_files/figure-html/unnamed-chunk-57-1.png" width="80%" /&gt;
 ]
 
 ---
 
----
+# Evaluate FIM for initial design
 
-# Evaluate FIM
+
+
+TODO add a snippet of create.poped.database to show discrete covariates.
 
 
 ```r
-FIM_mrg &lt;- evaluate.fim(poped_db_mrg) 
-get_rse(FIM_mrg, poped_db_mrg)
+FIM_gcsf &lt;- evaluate.fim(poped_db_gcsf)
+get_rse(FIM_gcsf, poped_db_gcsf)
 ```
 
+
 ```
-.    bpop[1]    bpop[2]    bpop[3]    bpop[4]    bpop[5]    bpop[6]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-.  10.874541  10.660202   7.935122   6.355306   8.894763   3.620234  38.990317  32.096512  31.668012  10.775738
+.    bpop[2]    bpop[5]    bpop[6]    bpop[7]    bpop[8]    bpop[9]   bpop[11]   bpop[13]   bpop[14]   bpop[15]   bpop[16] 
+.   3.289140  13.518742  12.604107   8.265412   3.822461  19.528269   4.066511  17.017908  10.771361  20.851250   8.289988 
+.   bpop[17]     D[1,1]     D[2,2]     D[3,3]     D[5,5]     D[6,6]     D[7,7] SIGMA[1,1] SIGMA[3,3] SIGMA[4,4] 
+.   7.664966  26.961113  32.644613  31.369081  41.941250  29.156946  26.406506   3.900224   6.541108   7.713365
 ```
+
+---
+
+class: poll-slide
+
+# Poll Question #3
+
+## Any better doses for estimating `\(SC_{50}\)` or `\(S_\textrm{max}\)`?
+
+
+
+---
+
+class: poll-slide
+
+# Poll Question #3
+
+## Any better doses for estimating `\(SC_{50}\)` or `\(S_\textrm{max}\)`?
+
+
+```
+.     design  bpop[2]  bpop[5]  bpop[6]   bpop[7]  bpop[8]  bpop[9] bpop[11] bpop[13] bpop[14] bpop[15]  bpop[16]
+. 1 Design 1 3.289140 13.51874 12.60411  8.265412 3.822461 19.52827 4.066511 17.01791 10.77136 20.85125  8.289988
+. 2 Design 2 4.673503 22.60097 18.10017 11.339302 4.770133 31.53689 5.165332 23.25978 11.01705 24.75670 13.637380
+. 3 Design 3 3.611770 16.64515 14.64052  9.541703 4.046387 22.17570 4.754518 19.52917 10.83622 21.77149  9.541640
+. 4 Design 4 4.848917 22.72584 18.06806 11.497486 4.990064 31.90498 5.406549 23.79308 10.92055 26.41584 13.910361
+.    bpop[17]   D[1,1]   D[2,2]   D[3,3]   D[5,5]   D[6,6]   D[7,7] SIGMA[1,1] SIGMA[3,3] SIGMA[4,4]
+. 1  7.664966 26.96111 32.64461 31.36908 41.94125 29.15695 26.40651   3.900224   6.541108   7.713365
+. 2 13.118787 28.00786 45.94778 40.79857 66.68504 31.74103 32.05223   3.877970   9.648244   5.874276
+. 3  8.701369 27.94482 42.18370 36.77592 49.09906 32.30964 31.92991   3.875563   8.012445   5.736824
+. 4 13.382760 27.61501 46.45427 40.89920 66.71012 34.50287 32.68775   3.868759   9.491601   5.593249
+```
+
+---
 
 class: inverse, center, middle
 
-# Example: Wrap up
+# Wrap up
 
 ---
 
 background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/1293/645438825_1039d343a0_k_d.jpg)
 background-size: cover
-  
+
 # What did we learn today?
 
 .pull-left[
@@ -1825,6 +1872,11 @@ background-size: cover
 --
 
 * Always run confirmatory simulations
+{{content}}
+
+--
+
+* Optimal design: it's not just for PK sampling any more!
 {{content}}
 
 ???
