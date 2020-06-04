@@ -1937,15 +1937,15 @@ poped_db_gcsf <- create.poped.database(
 ```
 
 ```{r}
-FIM_mrg <- evaluate.fim(poped_db_mrg) 
-get_rse(FIM_mrg, poped_db_mrg)
+FIM_gcsf <- evaluate.fim(poped_db_gcsf)
+get_rse(FIM_gcsf, poped_db_gcsf)
 ```
 
 class: inverse, center, middle
 
 ---
 
-# Example: Wrap up
+# Wrap up
 
 ---
 
