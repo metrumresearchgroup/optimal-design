@@ -10,14 +10,19 @@ Packages:
   - rmarkdown
   - PopED
   - rbabylon
+  - xaringan
+  - RefManageR
 
 Repos:
   - MPN: https://mpn.metworx.com/snapshots/stable/2020-04-18/
+  - CRAN_Micro: https://cran.microsoft.com/snapshot/2020-05-23
 
 Customizations:
   Packages:
   - metrumrg:
       Suggests: true
+  - xaringan:
+      Repos: CRAN_Micro
       
 Lockfile:
     Type: renv
