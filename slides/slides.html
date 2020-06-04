@@ -987,10 +987,8 @@ get_rse(FIM, poped_db)
 ```
 
 ```
-.      bpop[1]      bpop[2]      bpop[3]       D[1,1]       D[2,2]       D[3,3] 
-. 2.983306e+05 3.132072e+06 4.936333e+06 5.192188e+01 4.888612e+02 6.485818e+02 
-.   SIGMA[1,1]   SIGMA[2,2] 
-. 2.997297e+01 4.082483e+01
+.      bpop[1]      bpop[2]      bpop[3]       D[1,1]       D[2,2]       D[3,3]   SIGMA[1,1]   SIGMA[2,2] 
+. 2.983306e+05 3.132072e+06 4.936333e+06 5.192188e+01 4.888612e+02 6.485818e+02 2.997297e+01 4.082483e+01
 ```
 
 
@@ -1001,10 +999,8 @@ get_rse(FIM2, poped_db2)
 ```
 
 ```
-.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-.   15.48778  142.08530  223.35925   50.88485  418.53695  549.75962   29.68444 
-. SIGMA[2,2] 
-.   40.82396
+.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] SIGMA[2,2] 
+.   15.48778  142.08530  223.35925   50.88485  418.53695  549.75962   29.68444   40.82396
 ```
 
 ???
@@ -1111,10 +1107,8 @@ get_rse(FIM_extra_ss, poped_db_extra_ss)
 ```
 
 ```
-.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-.   13.38487   80.99149  119.36373   46.82132  253.41994  288.82097   24.18497 
-. SIGMA[2,2] 
-.   40.80823
+.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] SIGMA[2,2] 
+.   13.38487   80.99149  119.36373   46.82132  253.41994  288.82097   24.18497   40.80823
 ```
 
 ---
@@ -1187,10 +1181,8 @@ get_rse(FIM_final, poped_db_final)
 ```
 
 ```
-.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-.   12.31062   86.75053  136.64068   50.42738  317.03881  419.93344   29.55819 
-. SIGMA[2,2] 
-.   28.95827
+.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] SIGMA[2,2] 
+.   12.31062   86.75053  136.64068   50.42738  317.03881  419.93344   29.55819   28.95827
 ```
 
 ???
@@ -1263,10 +1255,8 @@ get_rse(FIM_practical, poped_db_practical)
 ```
 
 ```
-.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-.   10.15307   19.61044   22.79548   48.67831   97.63716   74.56113   26.52843 
-. SIGMA[2,2] 
-.   40.69749
+.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] SIGMA[2,2] 
+.   10.15307   19.61044   22.79548   48.67831   97.63716   74.56113   26.52843   40.69749
 ```
 
 ???
@@ -1634,10 +1624,8 @@ get_rse(FIM_mrg, poped_db_mrg)
 ```
 
 ```
-.    bpop[1]    bpop[2]    bpop[3]    bpop[4]    bpop[5]    bpop[6]     D[1,1] 
-.  10.874541  10.660202   7.935122   6.355306   8.894763   3.620234  38.990317 
-.     D[2,2]     D[3,3] SIGMA[1,1] 
-.  32.096512  31.668012  10.775738
+.    bpop[1]    bpop[2]    bpop[3]    bpop[4]    bpop[5]    bpop[6]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
+.  10.874541  10.660202   7.935122   6.355306   8.894763   3.620234  38.990317  32.096512  31.668012  10.775738
 ```
 
 ---
@@ -1761,6 +1749,63 @@ class: inverse, center, middle
 
 ---
 
+# Study design &amp; model
+
+.pull-left[
+
+* QD SC doses of filgrastim: 2.5, 5, and 10 &amp;mu;g/kg.
+
+* 10 subjects per dose group will be on active drug.
+
+* Dense PK and ANC samples on days 1 and 7.
+]
+
+.pull-right[
+
+![](pics/gcsf_paper.png)&lt;!-- --&gt;
+
+* PK/PD model from DDMORE .font-80[http://repository.ddmore.eu/model/DDMODEL00000077.6]
+
+* NONMEM model translated to `mrgsolve`
+]
+
+.footnote[Krzyzanski, Wiczling, Lowe, et al. (2010)]
+
+---
+
+# Filgrastim ANC model
+
+.center[
+&lt;img src="pics/gcsf_model.png" width="85%" /&gt;
+]
+
+.footnote[Krzyzanski, Wiczling, Lowe, et al. (2010)]
+
+---
+
+# PK and ANC simulations
+
+.center[
+&lt;img src="slides_files/figure-html/unnamed-chunk-56-1.png" width="80%" /&gt;
+]
+
+---
+
+---
+
+# Evaluate FIM
+
+
+```r
+FIM_mrg &lt;- evaluate.fim(poped_db_mrg) 
+get_rse(FIM_mrg, poped_db_mrg)
+```
+
+```
+.    bpop[1]    bpop[2]    bpop[3]    bpop[4]    bpop[5]    bpop[6]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
+.  10.874541  10.660202   7.935122   6.355306   8.894763   3.620234  38.990317  32.096512  31.668012  10.775738
+```
+
 class: inverse, center, middle
 
 # Example: Wrap up
@@ -1846,32 +1891,28 @@ Image credit: [Flickr](https://www.flickr.com/photos/dmuth/6039404304)
 
 # References
 
-Foracchia, M, A. Hooker, P. Vicini, et al. (2004). "POPED, a software
-for optimal experiment design in population kinetics". In: _Comput.
-Methods Programs Biomed._ 74.1, pp. 29-46.
+Foracchia, M, A. Hooker, P. Vicini, et al. (2004). "POPED, a software for optimal experiment design in
+population kinetics". In: _Comput. Methods Programs Biomed._ 74.1, pp. 29-46.
 
-Mentre, F, A. Mallet, and D. Baccar (1997). "Optimal design in
-random-effects regression models". In: _Biometrika_ 84.2, pp.
-429-442.
+Krzyzanski, W, P. Wiczling, P. Lowe, et al. (2010). "Population modeling of filgrastim PK-PD in healthy
+adults following intravenous and subcutaneous administrations". In: _J. Clin. Pharmacol._ 50.9 Suppl, pp.
+101S-112S.
 
-Nyberg, J, C. Bazzoli, K. Ogungbenro, et al. (2014). "Methods and
-software tools for design evaluation for population
-pharmacokinetics-pharmacodynamics studies". In: _Br. J. Clin.
-Pharmacol._.
+Mentre, F, A. Mallet, and D. Baccar (1997). "Optimal design in random-effects regression models". In:
+_Biometrika_ 84.2, pp. 429-442.
 
-Nyberg, J, S. Ueckert, E. A. Strömberg, et al. (2012). "PopED: an
-extended, parallelized, nonlinear mixed effects models optimal design
-tool". In: _Comput. Methods Programs Biomed._ 108.2, pp. 789-805.
+Nyberg, J, C. Bazzoli, K. Ogungbenro, et al. (2014). "Methods and software tools for design evaluation for
+population pharmacokinetics-pharmacodynamics studies". In: _Br. J. Clin. Pharmacol._.
 
-Retout, S, S. Duffull, and F. Mentre (2001). "Development and
-implementation of the population Fisher information matrix for the
-evaluation of population pharmacokinetic designs". In: _Comput.
-Methods Programs Biomed._ 65.2, pp. 141-151.
+Nyberg, J, S. Ueckert, E. A. Strömberg, et al. (2012). "PopED: an extended, parallelized, nonlinear mixed
+effects models optimal design tool". In: _Comput. Methods Programs Biomed._ 108.2, pp. 789-805.
 
-Retout, S. and F. Mentre (2003). "Further developments of the Fisher
-information matrix in nonlinear mixed effects models with evaluation
-in population pharmacokinetics". In: _J. Biopharm. Stat._ 13.2, pp.
-209-227.
+Retout, S, S. Duffull, and F. Mentre (2001). "Development and implementation of the population Fisher
+information matrix for the evaluation of population pharmacokinetic designs". In: _Comput. Methods Programs
+Biomed._ 65.2, pp. 141-151.
+
+Retout, S. and F. Mentre (2003). "Further developments of the Fisher information matrix in nonlinear mixed
+effects models with evaluation in population pharmacokinetics". In: _J. Biopharm. Stat._ 13.2, pp. 209-227.
 
 ---
 

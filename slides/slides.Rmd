@@ -1693,7 +1693,257 @@ class: inverse, center, middle
 
 ---
 
+# Study design & model
+
+.pull-left[
+
+* QD SC doses of filgrastim: 2.5, 5, and 10 &mu;g/kg.
+
+* 10 subjects per dose group will be on active drug.
+
+* Dense PK and ANC samples on days 1 and 7.
+]
+
+.pull-right[
+
+```{r echo=FALSE}
+knitr::include_graphics("pics/gcsf_paper.png")
+```
+
+* PK/PD model from DDMORE .font-80[http://repository.ddmore.eu/model/DDMODEL00000077.6]
+
+* NONMEM model translated to `mrgsolve`
+]
+
+.footnote[`r Citet(myBib, "Krzyzanski2010-dg")`]
+
+---
+
+# Filgrastim ANC model
+
+.center[
+```{r echo=FALSE, out.width="85%"}
+knitr::include_graphics("pics/gcsf_model.png")
+```
+]
+
+.footnote[`r Citet(myBib, "Krzyzanski2010-dg")`]
+
+---
+
+# PK and ANC simulations
+
+.center[
+```{r echo=FALSE, fig.width=6, fig.height=3, out.width="80%"}
+mod_gcsf <- mread(file.path("../script/model", "gcsf_poped"))
+doses <- c(0.1, 0.3, 1, 3, 10, 30)
+e <- expand.ev(amt = 75*doses, ii = 24, addl = 6)
+sim_gcsf <- mod_gcsf %>% mrgsim_df(e,  end = 240)
+sim_gcsf %>%
+  left_join(tibble(dose = doses, ID = seq_along(doses))) %>% 
+  select(dose, time, PK = CP, ANC = RESP) %>% 
+  mutate(dose = paste0(dose, " μg/kg")) %>% 
+  gather("response", "value", PK, ANC) %>% 
+  mutate(response = factor(response, levels = c("PK", "ANC"))) %>% 
+  ggplot(aes(time, value, colour = dose)) +
+  geom_line() +
+  facet_wrap(~ response, scales = "free_y") +
+  scale_y_log10() +
+  labs(
+    x = "Time from first dose (hr)",
+    y = NULL,
+    colour = NULL
+  )
+```
+]
+
+---
+
+# Evaluate FIM for initial design
+
+```{r echo=FALSE}
+ff_gcsf <- function(model_switch, xt, parameters, poped.db) {
+  
+  dose <- parameters[["DOSE"]]
+  wt <- parameters[["WT"]]
+  tau <- parameters[["TAU"]]
+  obs_time <- as.numeric(xt)
+  dose_time <- seq(from = 0, to = 6*tau, by = tau)
+  
+  dose <- data.frame(
+    ID = 1, 
+    amt = dose * wt,
+    cmt = 1, 
+    evid = 1,
+    time = dose_time
+  )
+  
+  obs <- data.frame(
+    ID = 1, 
+    amt = 0, 
+    cmt = 1, 
+    evid = 0, 
+    time = sort(obs_time)
+  )
+  
+  data <- arrange(bind_rows(dose,obs),time)
+  
+  mod_gcsf <- param(mod_gcsf, parameters)
+  
+  out <- mrgsim_q(mod_gcsf, data, output = "matrix")
+  
+  pk  <- out[data$evid==0,"CP",  drop=FALSE][match(obs_time,obs$time),]
+  anc <- out[data$evid==0,"RESP",drop=FALSE][match(obs_time,obs$time),]
+  
+  y <- xt
+  y[model_switch == 1] <- pk[model_switch == 1]
+  y[model_switch == 2] <- anc[model_switch == 2]
+  
+  return(list(y = y, poped.db = poped.db))
+}
+
+fg_gcsf <- function(x, a, bpop, b, bocc){
+  parameters = c(
+    FF    = bpop[1],
+    KA    = bpop[2] * exp(b[4]),
+    FR    = bpop[3],
+    D2    = bpop[4],
+    KEL   = bpop[5] * exp(b[2]),
+    VD    = bpop[6] * exp(b[3]),
+    KD    = bpop[7],
+    KINT  = bpop[8],
+    KSI   = bpop[9] * exp(b[5]),
+    KOFF  = bpop[10],
+    KMT   = bpop[11],
+    KBB1  = bpop[12],
+    KTT   = bpop[13],
+    NB0   = bpop[14] * exp(b[1]),
+    SC1   = bpop[15] * exp(b[6]),
+    SM1   = bpop[16] * exp(b[7]),
+    SM2   = bpop[17] * exp(b[8]),
+    SM3   = bpop[18],
+    DOSE  = a[1],
+    WT    = a[2],
+    TAU   = a[3] 
+  )
+  return(parameters) 
+}
+
+feps_gcsf <- function (model_switch, xt, parameters, epsi, poped.db) 
+{
+    returnArgs <- do.call(poped.db$model$ff_pointer, list(model_switch, 
+        xt, parameters, poped.db))
+    y <- returnArgs[[1]]
+    poped.db <- returnArgs[[2]]
+    
+    # PK
+    y[model_switch == 1] = y[model_switch == 1] * (1 + epsi[, 1]) + epsi[, 2]
+    # ANC
+    y[model_switch == 2] = y[model_switch == 2] * (1 + epsi[, 3]) + epsi[, 4]
+    
+    return(list(y = y, poped.db = poped.db))
+}
+
+pk_dense <- c(0.167, 0.25, 0.333, 0.5, 0.667, 0.75, 0.833, 1, 1.5, 2, 3, 4, 5,
+              6, 8, 10, 12, 14, 16, 18, 20, 24)
+anc_dense <- c(0.333, 0.5, 0.667, 0.75, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 14,
+               16, 18, 20, 24)
+poped_db_gcsf <- create.poped.database(
+  ff_fun = ff_gcsf,
+  fg_fun = fg_gcsf,
+  fError_fun = feps_gcsf,
+  bpop = c(
+    # parameter values from DDMORE
+    FF    = 6.26E-01,
+    KA    = 6.42E-01,
+    FR    = 1.00E+00,
+    D2    = 6.77E+00,
+    KEL   = 1.48E-01,
+    VD    = 2.56E+00,
+    KD    = 1.27E+00,
+    KINT  = 1.01E-01,
+    KSI   = 2.11E-01,
+    KOFF  = 0.00E+00,
+    KMT   = 7.23E-02,
+    KBB1  = 0.00E+00,
+    KTT   = 1.02E-02,
+    NB0   = 1.65E+00,
+    SC1   = 3.21E+00,
+    SM1   = 3.43E+01,
+    SM2   = 3.23E+01,
+    SM3   = 0.00E+00
+  ),
+  notfixed_bpop = c(
+    FF    = 0,
+    KA    = 1,
+    FR    = 0,
+    D2    = 0,
+    KEL   = 1,
+    VD    = 1,
+    KD    = 1,
+    KINT  = 1,
+    KSI   = 1,
+    KOFF  = 0,
+    KMT   = 1,
+    KBB1  = 0,
+    KTT   = 1,
+    NB0   = 1,
+    SC1   = 1,
+    SM1   = 1,
+    SM2   = 1,
+    SM3   = 0
+    ),
+  d = c(
+    NB0 = 2.98E-01,
+    KEL = 3.12E-01,
+    VD  = 3.28E-01,
+    KA  = 0.00E+00,
+    KSI = 2.24E-01,
+    SC1 = 8.03E-01,
+    SM1 = 1.28E-02,
+    SM2 = 0
+  ),
+  notfixed_d = c(
+    NB0 = 1,
+    KEL = 1,
+    VD  = 1,
+    KA  = 0,
+    KSI = 1,
+    SC1 = 1,
+    SM1 = 1,
+    SM2 = 0
+  ),
+  sigma = c(
+    2.53E-01,
+    0.00E+00,
+    2.27E-02,
+    2.10E+00
+  ),
+  notfixed_sigma = c(1, 0, 1, 1),
+  m = 3,
+  groupsize = 10,
+  xt = c(
+    pk_dense, pk_dense + 6*24, 7*24 + c(4, 24, 48),
+    anc_dense, (2:6)*24, anc_dense + 6*24, 7*24 + c(4, 24, 48, 72)
+    ),
+  model_switch = c(
+    rep(1, length(pk_dense)*2 + 3),
+    rep(2, length(anc_dense)*2 + length(2:6) + 4)
+  ),
+  bUseGrouped_xt = TRUE,
+  a = cbind(DOSE = c(1, 3, 10), WT = 75, TAU = 24),
+  discrete_a = list(DOSE = c(0.1, 0.3, 1, 2.5, 5, 10, 30), WT = 75, TAU = 24)
+)
+```
+
+```{r}
+FIM_mrg <- evaluate.fim(poped_db_mrg) 
+get_rse(FIM_mrg, poped_db_mrg)
+```
+
 class: inverse, center, middle
+
+---
 
 # Example: Wrap up
 
