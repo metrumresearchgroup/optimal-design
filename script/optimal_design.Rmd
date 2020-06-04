@@ -699,13 +699,15 @@ mod_gcsf %>% mrgsim(e, Req = "ANC = RESP", end = 240) %>% plot(ANC ~time)
 ```{r}
 ff_gcsf <- function(model_switch, xt, parameters, poped.db) {
   
+  dose <- parameters[["DOSE"]]
+  wt <- parameters[["WT"]]
   tau <- parameters[["TAU"]]
   obs_time <- as.numeric(xt)
   dose_time <- seq(from = 0, to = 6*tau, by = tau)
   
   dose <- data.frame(
     ID = 1, 
-    amt = parameters[["DOSE"]],
+    amt = dose * wt,
     cmt = 1, 
     evid = 1,
     time = dose_time
@@ -762,7 +764,8 @@ fg_gcsf <- function(x, a, bpop, b, bocc){
     SM2   = bpop[17] * exp(b[8]),
     SM3   = bpop[18],
     DOSE  = a[1],
-    TAU   = a[2] 
+    WT    = a[2],
+    TAU   = a[3] 
   )
   return(parameters) 
 }
@@ -876,10 +879,11 @@ poped_db_gcsf <- create.poped.database(
     rep(1, length(pk_dense)*2 + 3),
     rep(2, length(anc_dense)*2 + length(2:6) + 4)
   ),
-  minxt = 0,
-  maxxt = 10*24,
+  #minxt = 0,
+  #maxxt = 10*24,
   bUseGrouped_xt = TRUE,
-  a = cbind(DOSE = c(2.5, 5, 10)*75, TAU = 24)
+  a = cbind(DOSE = c(2.5, 5, 10), WT = 75, TAU = 24),
+  discrete_a = list(DOSE = c(0.1, 0.3, 1, 2.5, 5, 10, 30), WT = 75, TAU = 24)
   #a = cbind(DOSE = c(1, 3, 5)*75, TAU = 24)
   #a = cbind(DOSE = c(0.1, 0.3, 1)*75, TAU = 24)
   #a = cbind(DOSE = c(3, 10, 30)*75, TAU = 24)
@@ -908,6 +912,19 @@ plot_model_prediction(
 ```{r}
 system.time(FIM_gcsf <- evaluate.fim(poped_db_gcsf))
 get_rse(FIM_gcsf, poped_db_gcsf)
+```
+
+## Optimal doses
+
+```{r}
+output_gcsf <- poped_optim(
+  poped_db_gcsf,
+  opt_a = TRUE,
+  method = "ARS",
+  parallel = TRUE,
+  parallel_type = "multicore",
+  seed = 1
+)
 ```
 
 # Other resources
