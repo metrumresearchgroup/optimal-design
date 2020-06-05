@@ -184,6 +184,10 @@ knitr::include_graphics("https://upload.wikimedia.org/wikipedia/commons/0/09/Fis
 .font-70[Fisher in winter coat]
 ]
 
+???
+
+Image credit: https://commons.wikimedia.org/wiki/File:Fisher-face-teeth-snow_-_West_Virginia_-_ForestWander.jpg
+
 ---
 
 # Why should I care about that thing?
@@ -1465,6 +1469,19 @@ sum_est(est) %>%
 
 ---
 
+class: inverse, center
+
+background-image: url(https://live.staticflickr.com/60/223859228_220ffc00da_k_d.jpg)
+background-size: cover
+  
+# and now I'd like to pass the mic to Kyle
+
+???
+
+Image credit: [Flickr](https://www.flickr.com/photos/goro_memo/223859228)
+
+---
+
 class: inverse, center, middle
 
 # Example: ODE PK model
@@ -2043,7 +2060,7 @@ background-size: cover
 # What did we learn today?
 
 .pull-left[
-* Optimal design can be a useful tool
+* Optimal design can be a useful, if imperfect, tool to explore and optimize study design options
 {{content}}
 ]
 
