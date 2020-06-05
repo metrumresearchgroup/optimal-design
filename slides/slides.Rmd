@@ -620,7 +620,7 @@ designs <- bind_cols(
 
 4. `r designs %>% dplyr::filter(design == "Design 4") %>% pull(xt)` hours
 
-5. Sorry, my kid just came looking for snacks and I missed everything you just said.
+5. My kid came looking for snacks and I missed everything you just said.
 
 $t_\textrm{max} \approx$ 6 hours
 ]
@@ -1469,19 +1469,6 @@ sum_est(est) %>%
 
 ---
 
-class: inverse, center
-
-background-image: url(https://live.staticflickr.com/60/223859228_220ffc00da_k_d.jpg)
-background-size: cover
-  
-# and now I'd like to pass the mic to Kyle
-
-???
-
-Image credit: [Flickr](https://www.flickr.com/photos/goro_memo/223859228)
-
----
-
 class: inverse, center, middle
 
 # Example: ODE PK model
@@ -1983,7 +1970,7 @@ class: poll-slide
 
 # Poll Question #3
 
-## Any better doses for estimating $SC_{50}$ or $S_\textrm{max}$?
+## Any better doses for estimating $SC_{50}$ or $S_\textrm{max}$s?
 
 ```{r echo=FALSE}
 designs <- bind_cols(
@@ -2004,7 +1991,7 @@ designs <- bind_cols(
 
 4. `r designs %>% dplyr::filter(design == "Design 4") %>% pull(dose)` &mu;g/kg
 
-5. I was just checking on my laundry. It's almost done.
+5. Are you still talking? I think you're on mute.
 ]
 
 .pull-right[
