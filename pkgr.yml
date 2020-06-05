@@ -12,6 +12,7 @@ Packages:
   - rbabylon
   - xaringan
   - RefManageR
+  - kableExtra
 
 Repos:
   - MPN: https://mpn.metworx.com/snapshots/stable/2020-04-18/

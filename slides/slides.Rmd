@@ -25,6 +25,7 @@ library(tidyverse)
 library(PopED)
 library(mrgsolve)
 library(glue)
+library(kableExtra)
 theme_set(theme_bw())
 ```
 
@@ -177,8 +178,10 @@ where
 
 .pull-right[
 ```{r echo=FALSE}
-knitr::include_graphics("pics/Fisher1946.jpeg")
+#knitr::include_graphics("pics/Fisher1946.jpeg")
+knitr::include_graphics("https://upload.wikimedia.org/wikipedia/commons/0/09/Fisher-face-snow_-_West_Virginia_-_ForestWander.jpg")
 ```
+.font-70[Fisher in winter coat]
 ]
 
 ---
@@ -613,7 +616,7 @@ designs <- bind_cols(
 
 4. `r designs %>% dplyr::filter(design == "Design 4") %>% pull(xt)` hours
 
-5. Sorry, my kid just came looking for snacks.
+5. Sorry, my kid just came looking for snacks and I missed everything you just said.
 
 $t_\textrm{max} \approx$ 6 hours
 ]
@@ -1974,6 +1977,35 @@ designs <- bind_cols(
   gather("design", "dose")
 ```
 
+.pull-left[
+1. `r designs %>% dplyr::filter(design == "Design 1") %>% pull(dose)` &mu;g/kg
+
+2. `r designs %>% dplyr::filter(design == "Design 2") %>% pull(dose)` &mu;g/kg
+
+3. `r designs %>% dplyr::filter(design == "Design 3") %>% pull(dose)` &mu;g/kg
+
+4. `r designs %>% dplyr::filter(design == "Design 4") %>% pull(dose)` &mu;g/kg
+
+5. I was just checking on my laundry. It's almost done.
+]
+
+.pull-right[
+```{r echo=FALSE, fig.width=4, fig.height=3, out.width="100%"}
+sim_gcsf %>%
+  left_join(tibble(dose = doses, ID = seq_along(doses))) %>% 
+  select(dose, time, PK = CP, ANC = RESP) %>% 
+  mutate(dose = paste0(dose, " μg/kg")) %>% 
+  ggplot(aes(time, ANC, colour = dose)) +
+  geom_line() +
+  scale_y_log10() +
+  labs(
+    x = "Time from first dose (hr)",
+    y = NULL,
+    colour = NULL
+  )
+```
+]
+
 ---
 
 class: poll-slide
@@ -1984,7 +2016,16 @@ class: poll-slide
 
 ```{r echo=FALSE}
 rse_gcsf <- readRDS("../script/rse_gcsf.rds")
-as.data.frame(bind_cols(design = unique(designs[["design"]]), rse_gcsf))
+as.data.frame(bind_cols(design = unique(designs[["design"]]), rse_gcsf)) %>% 
+  mutate_if(is.numeric, round, 1) %>% 
+  t() %>% 
+  as_tibble(rownames = "Parameter") %>% 
+  set_names(c("Parameter", .[1,2:5])) %>% 
+  slice(-1) %>% 
+  dplyr::filter(str_detect(Parameter, "15|16|17")) %>% 
+  knitr::kable(format = "html") %>% 
+  row_spec(0, color = "black", background = "white") %>% 
+  column_spec(1:5, color = "black", background = "white")
 ```
 
 ---
