@@ -551,8 +551,9 @@ run_model <- function(.design_dir, .run_num) {
   
   # Run the model
   new_model(
-    .yaml_path = file.path(.design_dir, paste0(.run_num, ".yaml")),
-    .description = .run_num
+    .yaml_path = paste0(.run_num, ".yaml"),
+    .description = .run_num,
+    .directory = design_dir
   ) %>%
     submit_model()
 }
@@ -561,7 +562,7 @@ run_model <- function(.design_dir, .run_num) {
 ```{r}
 get_est <- function(.design_dir) {
   est <- map_dfr(seq_len(n_rep), function(.run_num) {
-    mod <- read_model(file.path(.design_dir, paste0(.run_num, ".yaml")))
+    mod <- read_model(paste0(.run_num, ".yaml"), .directory = .design_dir)
     mod_sum <- try(mod %>% model_summary(), silent = TRUE)
     if (inherits(mod_sum, "try-error")) return(NULL)
     #if (mod_sum$run_heuristics$minimization_terminated) return(NULL)
@@ -604,32 +605,44 @@ sum_est <- function(.est) {
 }
 ```
 
-Set up `rbabylon`.
-
-```{r}
-# setup bbi path
-# you must have a working installation of babylon at `/data/apps/bbi` for this to work. 
-# If you have one somewhere else, just change the path here. If not, please download from https://github.com/metrumresearchgroup/babylon/releases
-options('rbabylon.bbi_exe_path' = '/data/apps/bbi')
-```
 
 ## Design 1: proposed sampling.
 
 ```{r eval=FALSE}
-design_dir <- file.path("nonmem", "ex1_design1")
-# create babylon.yaml in model directory
-bbi_init(
-  .dir = design_dir,           # your modeling directory
-  .nonmem_dir = "/opt/NONMEM", # directory where NONMEM is installed
-  .nonmem_version = "nm74gf"   # default version of NONMEM to use
-)
+design_dir <- normalizePath(file.path("nonmem", "ex1_design1"), mustWork = FALSE)
+if (!fs::dir_exists(design_dir)) {
+  fs::dir_create(design_dir)
+}
+
 
 set.seed(1)
 # add 24 hours to SS samples, since we're including a SS dose at 24 hours
 times <- c(5, c(rep(24, 3), 168) + 24)
 ```
 
+
+Set up rbabylon to run nonmem - we also need the bbi executable. You can run  to install onto your system.
+Note, bbi is primarily tested and developed on linux and mac. Though it should work for windows, the configuration used here
+may not map 1:1 to windows usage. Check github.com/metrumresearchgroup/rbabylon for more information.
+
+```
+# once per machine:
+rbabylon::use_bbi()
+
+# create babylon.yaml in model directory - this should only need to get run once per new project/directory
+bbi_init(
+  .dir = design_dir,           # your modeling directory
+  .nonmem_dir = "/opt/NONMEM", # directory where NONMEM is installed
+  .nonmem_version = "nm74gf"   # default version of NONMEM to use
+)
+```
+
 ```{r eval=FALSE}
+rbabylon::bbi_init(
+  .dir = design_dir,           # your modeling directory
+  .nonmem_dir = "/opt/NONMEM", # directory where NONMEM is installed
+  .nonmem_version = "nm74gf"   # default version of NONMEM to use
+)
 walk(seq_len(n_rep), function(run_num) {
   write_data(design_dir, run_num, .times = times)
   run_model(design_dir, run_num)
@@ -655,13 +668,10 @@ sum_est(est) %>%
 ## Design 2: Near-optimal design with windows
 
 ```{r eval=FALSE}
-design_dir <- file.path("nonmem", "ex1_design2")
-# create babylon.yaml in model directory
-bbi_init(
-  .dir = design_dir,           # your modeling directory
-  .nonmem_dir = "/opt/NONMEM", # directory where NONMEM is installed
-  .nonmem_version = "nm74gf"   # default version of NONMEM to use
-)
+design_dir <- normalizePath(file.path("nonmem", "ex1_design2"), mustWork = FALSE)
+if (!fs::dir_exists(design_dir)) {
+  fs::dir_create(design_dir)
+}
 
 set.seed(1)
 # add 24 hours to SS samples, since we're including a SS dose at 24 hours
@@ -672,6 +682,7 @@ t_hi <- times + c(0.25, rep(1, 3), 2, 4)
 
 ```{r eval=FALSE}
 walk(seq_len(n_rep), function(run_num) {
+  run_num <- 1
   write_data(design_dir, run_num, .times = times,
              .times_lo = t_lo, .times_hi = t_hi)
   run_model(design_dir, run_num)
