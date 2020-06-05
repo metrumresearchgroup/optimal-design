@@ -4,9 +4,9 @@
     <title>A Gentle Introduction to Optimal Design for Pharmacometric Models</title>
     <meta charset="utf-8" />
     <meta name="author" content="Tim Waterhouse and Kyle Baron" />
-    <link href="libs/remark-css/default.css" rel="stylesheet" />
-    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
-    <script src="libs/kePrint/kePrint.js"></script>
+    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="libs/remark-css-0.0.1/default-fonts.css" rel="stylesheet" />
+    <script src="libs/kePrint-0.0.1/kePrint.js"></script>
     <link rel="stylesheet" href="tweaks.css" type="text/css" />
   </head>
   <body>
@@ -389,16 +389,16 @@ Although methods exist for optimal determination of the windows, you will mostly
 
 # Tools for optimal design
 
-![](pics/tools.png)&lt;!-- --&gt;
+&lt;img src="pics/tools.png" width="1077" /&gt;
 
-.footnote[Nyberg, Bazzoli, Ogungbenro, et al. (2014)]
+.footnote[Nyberg, Bazzoli, Ogungbenro, Aliev, Leonov, Duffull, Hooker, and Mentré (2014)]
 
 ---
 
 # PopED
 
 .pull-left[
-![](pics/PopED_logo.png)&lt;!-- --&gt;
+&lt;img src="pics/PopED_logo.png" width="522" /&gt;
 ]
 
 .pull-right[
@@ -406,8 +406,8 @@ Although methods exist for optimal determination of the windows, you will mostly
 
 * Originally in O-Matrix and Matlab, now an R package
 ]
-.footnote[Foracchia, Hooker, Vicini, et al. (2004) &lt;br&gt;
-Nyberg, Ueckert, Strömberg, et al. (2012)]
+.footnote[Foracchia, Hooker, Vicini, and Ruggeri (2004) &lt;br&gt;
+Nyberg, Ueckert, Strömberg, Hennig, Karlsson, and Hooker (2012)]
 
 ---
 
@@ -988,7 +988,7 @@ det(FIM)
 ```
 
 ```
-. [1] 0.04804071
+. [1] 0.04804063
 ```
 
 
@@ -998,7 +998,7 @@ get_rse(FIM, poped_db)
 
 ```
 .      bpop[1]      bpop[2]      bpop[3]       D[1,1]       D[2,2]       D[3,3] 
-. 2.983306e+05 3.132072e+06 4.936333e+06 5.192188e+01 4.888612e+02 6.485818e+02 
+. 2.983332e+05 3.132099e+06 4.936376e+06 5.192188e+01 4.888612e+02 6.485818e+02 
 .   SIGMA[1,1]   SIGMA[2,2] 
 . 2.997297e+01 4.082483e+01
 ```
@@ -1377,8 +1377,9 @@ run_model &lt;- function(.design_dir, .run_num) {
   
   # Run the model
 * new_model(
-*   .yaml_path = file.path(.design_dir, paste0(.run_num, ".yaml")),
-*   .description = .run_num
+*   .yaml_path = paste0(.run_num, ".yaml"),
+*   .description = .run_num,
+*   .directory = design_dir
 * ) %&gt;%
 *   submit_model()
 }
@@ -1392,7 +1393,7 @@ run_model &lt;- function(.design_dir, .run_num) {
 ```r
 get_est &lt;- function(.design_dir) {
   est &lt;- map_dfr(seq_len(n_rep), function(.run_num) {
-*   mod &lt;- read_model(file.path(.design_dir, paste0(.run_num, ".yaml")))
+*   mod &lt;- read_model(paste0(.run_num, ".yaml"), .directory = .design_dir)
 *   mod_sum &lt;- try(mod %&gt;% model_summary(), silent = TRUE)
     if (inherits(mod_sum, "try-error")) return(NULL)
     mod_sum %&gt;% 
@@ -1645,9 +1646,9 @@ get_rse(FIM_mrg, poped_db_mrg)
 
 ```
 .    bpop[1]    bpop[2]    bpop[3]    bpop[4]    bpop[5]    bpop[6]     D[1,1] 
-.  10.874541  10.660202   7.935122   6.355306   8.894763   3.620234  38.990317 
+.  10.874298  10.660146   7.935583   6.355286   8.894680   3.620177  38.989274 
 .     D[2,2]     D[3,3] SIGMA[1,1] 
-.  32.096512  31.668012  10.775738
+.  32.096499  31.667628  10.775830
 ```
 
 ---
@@ -1784,14 +1785,14 @@ class: inverse, center, middle
 
 .pull-right[
 
-![](pics/gcsf_paper.png)&lt;!-- --&gt;
+&lt;img src="pics/gcsf_paper.png" width="681" /&gt;
 
 * PK/PD model from DDMORE .font-80[http://repository.ddmore.eu/model/DDMODEL00000077.6]
 
 * NONMEM model translated to `mrgsolve`
 ]
 
-.footnote[Krzyzanski, Wiczling, Lowe, et al. (2010)]
+.footnote[Krzyzanski, Wiczling, Lowe, Pigeolet, Fink, Berghout, and Balser (2010)]
 
 ---
 
@@ -2006,8 +2007,7 @@ and subcutaneous administrations". In: _J. Clin. Pharmacol._ 50.9
 Suppl, pp. 101S-112S.
 
 Mentre, F, A. Mallet, and D. Baccar (1997). "Optimal design in
-random-effects regression models". In: _Biometrika_ 84.2, pp.
-429-442.
+random-effects regression models". In: _Biometrika_ 84.2, pp. 429-442.
 
 Nyberg, J, C. Bazzoli, K. Ogungbenro, et al. (2014). "Methods and
 software tools for design evaluation for population
@@ -2020,12 +2020,12 @@ tool". In: _Comput. Methods Programs Biomed._ 108.2, pp. 789-805.
 
 Retout, S, S. Duffull, and F. Mentre (2001). "Development and
 implementation of the population Fisher information matrix for the
-evaluation of population pharmacokinetic designs". In: _Comput.
-Methods Programs Biomed._ 65.2, pp. 141-151.
+evaluation of population pharmacokinetic designs". In: _Comput. Methods
+Programs Biomed._ 65.2, pp. 141-151.
 
 Retout, S. and F. Mentre (2003). "Further developments of the Fisher
-information matrix in nonlinear mixed effects models with evaluation
-in population pharmacokinetics". In: _J. Biopharm. Stat._ 13.2, pp.
+information matrix in nonlinear mixed effects models with evaluation in
+population pharmacokinetics". In: _J. Biopharm. Stat._ 13.2, pp.
 209-227.
 
 ---
@@ -2083,6 +2083,32 @@ if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
     deleted = true;
   });
 })();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
 // adds .remark-code-has-line-highlighted class to <pre> parent elements
 // of code chunks containing highlighted lines with class .remark-code-line-highlighted
 (function(d) {
@@ -2100,17 +2126,6 @@ if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
   }
   preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
 })(document);</script>
-
-<script>
-(function() {
-  var links = document.getElementsByTagName('a');
-  for (var i = 0; i < links.length; i++) {
-    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
-      links[i].target = '_blank';
-    }
-  }
-})();
-</script>
 
 <script>
 slideshow._releaseMath = function(el) {

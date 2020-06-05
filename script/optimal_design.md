@@ -788,8 +788,9 @@ run_model <- function(.design_dir, .run_num) {
   
   # Run the model
   new_model(
-    .yaml_path = file.path(.design_dir, paste0(.run_num, ".yaml")),
-    .description = .run_num
+    .yaml_path = paste0(.run_num, ".yaml"),
+    .description = .run_num,
+    .directory = design_dir
   ) %>%
     submit_model()
 }
@@ -798,7 +799,7 @@ run_model <- function(.design_dir, .run_num) {
 ``` r
 get_est <- function(.design_dir) {
   est <- map_dfr(seq_len(n_rep), function(.run_num) {
-    mod <- read_model(file.path(.design_dir, paste0(.run_num, ".yaml")))
+    mod <- read_model(paste0(.run_num, ".yaml"), .directory = .design_dir)
     mod_sum <- try(mod %>% model_summary(), silent = TRUE)
     if (inherits(mod_sum, "try-error")) return(NULL)
     #if (mod_sum$run_heuristics$minimization_terminated) return(NULL)
@@ -841,32 +842,42 @@ sum_est <- function(.est) {
 }
 ```
 
-Set up `rbabylon`.
-
-``` r
-# setup bbi path
-# you must have a working installation of babylon at `/data/apps/bbi` for this to work. 
-# If you have one somewhere else, just change the path here. If not, please download from https://github.com/metrumresearchgroup/babylon/releases
-options('rbabylon.bbi_exe_path' = '/data/apps/bbi')
-```
-
 ## Design 1: proposed sampling.
 
 ``` r
-design_dir <- file.path("nonmem", "ex1_design1")
-# create babylon.yaml in model directory
-bbi_init(
-  .dir = design_dir,           # your modeling directory
-  .nonmem_dir = "/opt/NONMEM", # directory where NONMEM is installed
-  .nonmem_version = "nm74gf"   # default version of NONMEM to use
-)
+design_dir <- normalizePath(file.path("nonmem", "ex1_design1"), mustWork = FALSE)
+if (!fs::dir_exists(design_dir)) {
+  fs::dir_create(design_dir)
+}
+
 
 set.seed(1)
 # add 24 hours to SS samples, since we're including a SS dose at 24 hours
 times <- c(5, c(rep(24, 3), 168) + 24)
 ```
 
+Set up rbabylon to run nonmem - we also need the bbi executable. You can
+run to install onto your system. Note, bbi is primarily tested and
+developed on linux and mac. Though it should work for windows, the
+configuration used here may not map 1:1 to windows usage. Check
+github.com/metrumresearchgroup/rbabylon for more information.
+
+    # once per machine:
+    rbabylon::use_bbi()
+    
+    # create babylon.yaml in model directory - this should only need to get run once per new project/directory
+    bbi_init(
+      .dir = design_dir,           # your modeling directory
+      .nonmem_dir = "/opt/NONMEM", # directory where NONMEM is installed
+      .nonmem_version = "nm74gf"   # default version of NONMEM to use
+    )
+
 ``` r
+rbabylon::bbi_init(
+  .dir = design_dir,           # your modeling directory
+  .nonmem_dir = "/opt/NONMEM", # directory where NONMEM is installed
+  .nonmem_version = "nm74gf"   # default version of NONMEM to use
+)
 walk(seq_len(n_rep), function(run_num) {
   write_data(design_dir, run_num, .times = times)
   run_model(design_dir, run_num)
@@ -883,7 +894,7 @@ est <- readRDS("ex1_est1.rds")
 plot_est(est) + scale_y_continuous(limits =  c(-110, 500))
 ```
 
-![](optimal_design_files/figure-gfm/unnamed-chunk-39-1.png)<!-- -->
+![](optimal_design_files/figure-gfm/unnamed-chunk-38-1.png)<!-- -->
 
 ``` r
 sum_est(est) %>% 
@@ -906,13 +917,10 @@ sum_est(est) %>%
 ## Design 2: Near-optimal design with windows
 
 ``` r
-design_dir <- file.path("nonmem", "ex1_design2")
-# create babylon.yaml in model directory
-bbi_init(
-  .dir = design_dir,           # your modeling directory
-  .nonmem_dir = "/opt/NONMEM", # directory where NONMEM is installed
-  .nonmem_version = "nm74gf"   # default version of NONMEM to use
-)
+design_dir <- normalizePath(file.path("nonmem", "ex1_design2"), mustWork = FALSE)
+if (!fs::dir_exists(design_dir)) {
+  fs::dir_create(design_dir)
+}
 
 set.seed(1)
 # add 24 hours to SS samples, since we're including a SS dose at 24 hours
@@ -923,6 +931,7 @@ t_hi <- times + c(0.25, rep(1, 3), 2, 4)
 
 ``` r
 walk(seq_len(n_rep), function(run_num) {
+  run_num <- 1
   write_data(design_dir, run_num, .times = times,
              .times_lo = t_lo, .times_hi = t_hi)
   run_model(design_dir, run_num)
@@ -939,7 +948,7 @@ est <- readRDS("ex1_est2.rds")
 plot_est(est)
 ```
 
-![](optimal_design_files/figure-gfm/unnamed-chunk-44-1.png)<!-- -->
+![](optimal_design_files/figure-gfm/unnamed-chunk-43-1.png)<!-- -->
 
 ``` r
 sum_est(est) %>% 
@@ -1114,7 +1123,7 @@ plot_model_prediction(
   scale_y_log10(lim = c(0.01, 1e4))
 ```
 
-![](optimal_design_files/figure-gfm/unnamed-chunk-52-1.png)<!-- -->
+![](optimal_design_files/figure-gfm/unnamed-chunk-51-1.png)<!-- -->
 
 ## Evaluate FIM
 
@@ -1153,7 +1162,7 @@ p <- readRDS("windows_mrg.rds")
 p
 ```
 
-![](optimal_design_files/figure-gfm/unnamed-chunk-54-1.png)<!-- -->
+![](optimal_design_files/figure-gfm/unnamed-chunk-53-1.png)<!-- -->
 
 Again, the 100 sets of simulated samples show no significant deviations
 from the RSEs for the original samples, so we’re golden.
@@ -1221,13 +1230,10 @@ write_data <- function(.design_dir, .run_num, .times = NULL, .times_lo = NULL, .
 ```
 
 ``` r
-design_dir <- file.path("nonmem", "ex2_design1")
-# create babylon.yaml in model directory
-bbi_init(
-  .dir = design_dir,           # your modeling directory
-  .nonmem_dir = "/opt/NONMEM", # directory where NONMEM is installed
-  .nonmem_version = "nm74gf"   # default version of NONMEM to use
-)
+design_dir <- normalizePath(file.path("nonmem", "ex2_design1"), mustWork = FALSE)
+if (!fs::dir_exists(design_dir)) {
+  fs::dir_create(design_dir)
+}
 
 set.seed(1)
 times <- c(c(1, 4)/24, 1, 3, 7, 14, 21)
@@ -1253,7 +1259,7 @@ est <- readRDS("ex2_est1.rds")
 plot_est(est)
 ```
 
-![](optimal_design_files/figure-gfm/unnamed-chunk-60-1.png)<!-- -->
+![](optimal_design_files/figure-gfm/unnamed-chunk-59-1.png)<!-- -->
 
 ``` r
 sum_est(est) %>% 
@@ -1275,6 +1281,304 @@ sum_est(est) %>%
     .  8 OMEGA(2,2)         32.1        51.1         24.6 
     .  9 OMEGA(4,4)         31.7        52.3        -12.6 
     . 10 SIGMA(1,1)         10.8        12.3         -6.98
+
+# PK/PD example: G-CSF
+
+[Vignette](https://github.com/mrgsolve/depot/blob/master/vignette/gcsf.md)
+[Model](https://github.com/mrgsolve/depot/blob/master/pkg/inst/models/gcsf.cpp)
+
+``` r
+mod_gcsf <- mread(file.path("model", "gcsf_poped")) %>% zero_re()
+
+e <- expand.ev(amt = 75*c(1, 3, 10), ii = 24, addl = 6)
+mod_gcsf %>% mrgsim(e, Req = "ANC = RESP", end = 240) %>% plot(ANC ~time)
+```
+
+![](optimal_design_files/figure-gfm/unnamed-chunk-61-1.png)<!-- -->
+
+``` r
+#mod %>% mrgsim(e, end = 21) %>% plot()
+```
+
+## `ff()`
+
+``` r
+ff_gcsf <- function(model_switch, xt, parameters, poped.db) {
+  
+  dose <- parameters[["DOSE"]]
+  wt <- parameters[["WT"]]
+  tau <- parameters[["TAU"]]
+  obs_time <- as.numeric(xt)
+  dose_time <- seq(from = 0, to = 6*tau, by = tau)
+  
+  dose <- data.frame(
+    ID = 1, 
+    amt = dose * wt,
+    cmt = 1, 
+    evid = 1,
+    time = dose_time
+  )
+  
+  obs <- data.frame(
+    ID = 1, 
+    amt = 0, 
+    cmt = 1, 
+    evid = 0, 
+    time = sort(obs_time)
+  )
+  
+  data <- arrange(bind_rows(dose,obs),time)
+  
+  mod_gcsf <- param(mod_gcsf, parameters)
+  
+  out <- mrgsim_q(mod_gcsf, data, output = "matrix")
+  
+  pk  <- out[data$evid==0,"CP",  drop=FALSE][match(obs_time,obs$time),]
+  anc <- out[data$evid==0,"RESP",drop=FALSE][match(obs_time,obs$time),]
+  
+  y <- xt
+  y[model_switch == 1] <- pk[model_switch == 1]
+  y[model_switch == 2] <- anc[model_switch == 2]
+  
+  return(list(y = y, poped.db = poped.db))
+}
+```
+
+## `fg()`
+
+IIV on `KA`, `KEL`, `VD`, `KSI`, `NB0`, `SC1`, `SM1`, and `SM2`, and
+pass through dose and dosing interval as a covariate.
+
+``` r
+fg_gcsf <- function(x, a, bpop, b, bocc){
+  parameters = c(
+    FF    = bpop[1],
+    KA    = bpop[2] * exp(b[4]),
+    FR    = bpop[3],
+    D2    = bpop[4],
+    KEL   = bpop[5] * exp(b[2]),
+    VD    = bpop[6] * exp(b[3]),
+    KD    = bpop[7],
+    KINT  = bpop[8],
+    KSI   = bpop[9] * exp(b[5]),
+    KOFF  = bpop[10],
+    KMT   = bpop[11],
+    KBB1  = bpop[12],
+    KTT   = bpop[13],
+    NB0   = bpop[14] * exp(b[1]),
+    SC1   = bpop[15] * exp(b[6]),
+    SM1   = bpop[16] * exp(b[7]),
+    SM2   = bpop[17] * exp(b[8]),
+    SM3   = bpop[18],
+    DOSE  = a[1],
+    WT    = a[2],
+    TAU   = a[3] 
+  )
+  return(parameters) 
+}
+```
+
+## `feps()`
+
+``` r
+feps_gcsf <- function (model_switch, xt, parameters, epsi, poped.db) 
+{
+    returnArgs <- do.call(poped.db$model$ff_pointer, list(model_switch, 
+        xt, parameters, poped.db))
+    y <- returnArgs[[1]]
+    poped.db <- returnArgs[[2]]
+    
+    # PK
+    y[model_switch == 1] = y[model_switch == 1] * (1 + epsi[, 1]) + epsi[, 2]
+    # ANC
+    y[model_switch == 2] = y[model_switch == 2] * (1 + epsi[, 3]) + epsi[, 4]
+    
+    return(list(y = y, poped.db = poped.db))
+}
+```
+
+## `create.poped.database()`
+
+``` r
+pk_dense <- c(0.167, 0.25, 0.333, 0.5, 0.667, 0.75, 0.833, 1, 1.5, 2, 3, 4, 5,
+              6, 8, 10, 12, 14, 16, 18, 20, 24)
+anc_dense <- c(0.333, 0.5, 0.667, 0.75, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 14,
+               16, 18, 20, 24)
+poped_db_gcsf <- create.poped.database(
+  ff_fun = ff_gcsf,
+  fg_fun = fg_gcsf,
+  fError_fun = feps_gcsf,
+  bpop = c(
+    # parameter values from DDMORE
+    FF    = 6.26E-01,
+    KA    = 6.42E-01,
+    FR    = 1.00E+00,
+    D2    = 6.77E+00,
+    KEL   = 1.48E-01,
+    VD    = 2.56E+00,
+    KD    = 1.27E+00,
+    KINT  = 1.01E-01,
+    KSI   = 2.11E-01,
+    KOFF  = 0.00E+00,
+    KMT   = 7.23E-02,
+    KBB1  = 0.00E+00,
+    KTT   = 1.02E-02,
+    NB0   = 1.65E+00,
+    SC1   = 3.21E+00,
+    SM1   = 3.43E+01,
+    SM2   = 3.23E+01,
+    SM3   = 0.00E+00
+  ),
+  notfixed_bpop = c(
+    FF    = 0,
+    KA    = 1,
+    FR    = 0,
+    D2    = 0,
+    KEL   = 1,
+    VD    = 1,
+    KD    = 1,
+    KINT  = 1,
+    KSI   = 1,
+    KOFF  = 0,
+    KMT   = 1,
+    KBB1  = 0,
+    KTT   = 1,
+    NB0   = 1,
+    SC1   = 1,
+    SM1   = 1,
+    SM2   = 1,
+    SM3   = 0
+    ),
+  d = c(
+    NB0 = 2.98E-01,
+    KEL = 3.12E-01,
+    VD  = 3.28E-01,
+    KA  = 0.00E+00,
+    KSI = 2.24E-01,
+    SC1 = 8.03E-01,
+    SM1 = 1.28E-02,
+    SM2 = 0
+  ),
+  notfixed_d = c(
+    NB0 = 1,
+    KEL = 1,
+    VD  = 1,
+    KA  = 0,
+    KSI = 1,
+    SC1 = 1,
+    SM1 = 1,
+    SM2 = 0
+  ),
+  sigma = c(
+    2.53E-01,
+    0.00E+00,
+    2.27E-02,
+    2.10E+00
+  ),
+  notfixed_sigma = c(1, 0, 1, 1),
+  m = 3,
+  groupsize = 10,
+  xt = c(
+    pk_dense, pk_dense + 6*24, 7*24 + c(4, 24, 48),
+    anc_dense, (2:6)*24, anc_dense + 6*24, 7*24 + c(4, 24, 48, 72)
+    ),
+  model_switch = c(
+    rep(1, length(pk_dense)*2 + 3),
+    rep(2, length(anc_dense)*2 + length(2:6) + 4)
+  ),
+  #minxt = 0,
+  #maxxt = 10*24,
+  bUseGrouped_xt = TRUE,
+  a = cbind(DOSE = c(1, 3, 10), WT = 75, TAU = 24),
+  #discrete_a = list(DOSE = c(0.1, 0.3, 1, 2.5, 5, 10, 30), WT = 75, TAU = 24)
+  discrete_a = list(DOSE = c(0.1, 0.3, 1, 3, 10, 30), WT = 75, TAU = 24)
+  #discrete_a = list(DOSE = c(2.5, 5, 10), WT = 75, TAU = 24)
+  #a = cbind(DOSE = c(1, 3, 5)*75, TAU = 24)
+  #a = cbind(DOSE = c(0.1, 0.3, 1)*75, TAU = 24)
+  #a = cbind(DOSE = c(3, 10, 30)*75, TAU = 24)
+  #a = cbind(DOSE = c(30, 100, 300)*75, TAU = 24)
+  #a = cbind(DOSE = c(1, 3, 30)*75, TAU = 24)
+  #a = cbind(DOSE = c(1, 3, 10)*75, TAU = 24)
+)
+```
+
+## Test plot
+
+``` r
+plot_model_prediction(
+  poped_db_gcsf,
+  model.names = c("PK", "ANC"),
+  facet_scales = "free_y",
+  model_num_points = 200
+) +
+  labs(x = "Time from first dose (hours)") +
+  #scale_y_log10(lim = c(0.01, 1e4)) +
+  NULL
+```
+
+![](optimal_design_files/figure-gfm/unnamed-chunk-66-1.png)<!-- -->
+
+## Evaluate FIM
+
+``` r
+system.time(FIM_gcsf <- evaluate.fim(poped_db_gcsf))
+saveRDS(FIM_gcsf, "FIM_gcsf.rds")
+```
+
+``` r
+FIM_gcsf <- readRDS("FIM_gcsf.rds")
+get_rse(FIM_gcsf, poped_db_gcsf)
+```
+
+    .    bpop[2]    bpop[5]    bpop[6]    bpop[7]    bpop[8]    bpop[9]   bpop[11] 
+    .   3.289140  13.518742  12.604107   8.265412   3.822461  19.528269   4.066511 
+    .   bpop[13]   bpop[14]   bpop[15]   bpop[16]   bpop[17]     D[1,1]     D[2,2] 
+    .  17.017908  10.771361  20.851250   8.289988   7.664966  26.961113  32.644613 
+    .     D[3,3]     D[5,5]     D[6,6]     D[7,7] SIGMA[1,1] SIGMA[3,3] SIGMA[4,4] 
+    .  31.369081  41.941250  29.156946  26.406506   3.900224   6.541108   7.713365
+
+## Any better doses?
+
+``` r
+designs <- bind_cols(
+  `Design 1` = c(1, 3, 10),
+  `Design 2` = c(0.3, 1, 3),
+  `Design 3` = c(0.3, 1, 10),
+  `Design 4` = c(0.1, 1, 3)
+) %>% 
+  gather("design", "dose")
+```
+
+``` r
+rse_gcsf <- map_dfr(unique(designs[["design"]]), function(.design) {
+  cat(.design, "\n")
+  doses <- designs %>% filter(design == .design) %>% pull(dose)
+  poped_db_gcsf_tmp <- create.poped.database(
+    poped_db_gcsf,
+    a = cbind(DOSE = doses, WT = 75, TAU = 24)
+  )
+  FIM_gcsf_tmp <- evaluate.fim(poped_db_gcsf_tmp)
+  as.list(get_rse(FIM_gcsf_tmp, poped_db_gcsf_tmp))
+})
+saveRDS(rse_gcsf, "rse_gcsf.rds")
+```
+
+``` r
+rse_gcsf <- readRDS("rse_gcsf.rds")
+bind_cols(design = unique(designs[["design"]]), rse_gcsf)
+```
+
+    . # A tibble: 4 x 22
+    .   design `bpop[2]` `bpop[5]` `bpop[6]` `bpop[7]` `bpop[8]` `bpop[9]` `bpop[11]`
+    .   <chr>      <dbl>     <dbl>     <dbl>     <dbl>     <dbl>     <dbl>      <dbl>
+    . 1 Desig…      3.29      13.5      12.6      8.27      3.82      19.5       4.07
+    . 2 Desig…      4.67      22.6      18.1     11.3       4.77      31.5       5.17
+    . 3 Desig…      3.61      16.6      14.6      9.54      4.05      22.2       4.75
+    . 4 Desig…      4.85      22.7      18.1     11.5       4.99      31.9       5.41
+    . # … with 14 more variables: `bpop[13]` <dbl>, `bpop[14]` <dbl>,
+    . #   `bpop[15]` <dbl>, `bpop[16]` <dbl>, `bpop[17]` <dbl>, `D[1,1]` <dbl>,
+    . #   `D[2,2]` <dbl>, `D[3,3]` <dbl>, `D[5,5]` <dbl>, `D[6,6]` <dbl>,
+    . #   `D[7,7]` <dbl>, `SIGMA[1,1]` <dbl>, `SIGMA[3,3]` <dbl>, `SIGMA[4,4]` <dbl>
 
 # Other resources
 
