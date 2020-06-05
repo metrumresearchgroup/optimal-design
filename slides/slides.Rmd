@@ -1384,8 +1384,9 @@ run_model <- function(.design_dir, .run_num) {
   
   # Run the model
   new_model( #<<
-    .yaml_path = file.path(.design_dir, paste0(.run_num, ".yaml")), #<<
-    .description = .run_num #<<
+    .yaml_path = paste0(.run_num, ".yaml"), #<<
+    .description = .run_num, #<<
+    .directory = design_dir #<<
   ) %>% #<<
     submit_model() #<<
 }
@@ -1398,7 +1399,7 @@ run_model <- function(.design_dir, .run_num) {
 ```{r eval=FALSE}
 get_est <- function(.design_dir) {
   est <- map_dfr(seq_len(n_rep), function(.run_num) {
-    mod <- read_model(file.path(.design_dir, paste0(.run_num, ".yaml"))) #<<
+    mod <- read_model(paste0(.run_num, ".yaml"), .directory = .design_dir) #<<
     mod_sum <- try(mod %>% model_summary(), silent = TRUE) #<<
     if (inherits(mod_sum, "try-error")) return(NULL)
     mod_sum %>% 
