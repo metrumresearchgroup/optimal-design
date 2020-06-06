@@ -3,7 +3,7 @@
   <head>
     <title>A Gentle Introduction to Optimal Design for Pharmacometric Models</title>
     <meta charset="utf-8" />
-    <meta name="author" content="Tim Waterhouse and Kyle Baron" />
+    <meta name="author" content="Tim Waterhouse" />
     <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
     <link href="libs/remark-css-0.0.1/default-fonts.css" rel="stylesheet" />
     <script src="libs/kePrint-0.0.1/kePrint.js"></script>
@@ -22,7 +22,7 @@ class: title-slide
 # A Gentle Introduction to Optimal Design &lt;br/&gt; for Pharmacometric Models
 ## with PopED and mrgsolve
 
-## Tim Waterhouse and Kyle Baron &lt;br/&gt; Metrum Research Group
+## Tim Waterhouse &lt;br/&gt; Metrum Research Group
 ## 8 June, 2020
 
 ---
@@ -174,11 +174,11 @@ when `\(\hat{\mathbf{\Psi}}\)` is an unbiased estimator of `\(\mathbf{\Psi}\)`.
 
 --
 
-* Relative standard errors (RSEs) can be obtained from the diagonals of the inverse of the FIM
+* Lower bounds for elative standard errors (RSEs) can be obtained from the diagonals of the inverse of the FIM
 
 --
 
-* This means we have a quick way of evaluating (a lower bound on) the precision of our parameter estimates.
+* This means we have a quick way of evaluating (lower bounds on) the precision of our parameter estimates.
 
 --
 
@@ -195,7 +195,7 @@ As the name implies, optimal designs are experimental designs that are optimal w
 
 .pull-left[
 $$
-\mathrm{cov}(\hat{\mathbf{\Psi}}) \geq  M_F(\mathbf{\Psi},\xi)
+\mathrm{cov}(\hat{\mathbf{\Psi}}) \geq  \left[M_F(\mathbf{\Psi},\xi)\right]^{-1}
 $$
 ]
 
@@ -372,6 +372,10 @@ Image credit: [Flickr](https://www.flickr.com/photos/hyperxp/6847495120)
 {{content}}
 ]
 
+???
+
+* Instead of sampling at 9 hours, can specify "between 8 and 10 hours"
+
 --
 
 * Even without optimisation, we can't always collect samples at precise times
@@ -393,7 +397,7 @@ Although methods exist for optimal determination of the windows, you will mostly
 
 # Tools for optimal design
 
-&lt;img src="pics/tools.png" width="1077" /&gt;
+![](pics/tools.png)&lt;!-- --&gt;
 
 .footnote[Nyberg, Bazzoli, Ogungbenro, et al. (2014)]
 
@@ -402,7 +406,7 @@ Although methods exist for optimal determination of the windows, you will mostly
 # PopED
 
 .pull-left[
-&lt;img src="pics/PopED_logo.png" width="522" /&gt;
+![](pics/PopED_logo.png)&lt;!-- --&gt;
 ]
 
 .pull-right[
@@ -434,7 +438,7 @@ class: inverse, center, middle
 .pull-left[
 **Mockdrozaline** has been studied in adult subjects, and we now must design a study in pediatric patients.
 
-The primary objective is to evaluate the PK in this new population, but PK sampling is necessarily sparse.
+A study objective is to evaluate the PK in this new population, but PK sampling is necessarily sparse.
 
 Our mission is to ensure that these samples are timed such that we can sufficiently estimate the PK parameters in pediatric patients.
 ]
@@ -992,7 +996,7 @@ det(FIM)
 ```
 
 ```
-. [1] 0.04804063
+. [1] 0.04804071
 ```
 
 
@@ -1001,8 +1005,10 @@ get_rse(FIM, poped_db)
 ```
 
 ```
-.      bpop[1]      bpop[2]      bpop[3]       D[1,1]       D[2,2]       D[3,3]   SIGMA[1,1]   SIGMA[2,2] 
-. 2.983332e+05 3.132099e+06 4.936376e+06 5.192188e+01 4.888612e+02 6.485818e+02 2.997297e+01 4.082483e+01
+.      bpop[1]      bpop[2]      bpop[3]       D[1,1]       D[2,2]       D[3,3] 
+. 2.983306e+05 3.132072e+06 4.936333e+06 5.192188e+01 4.888612e+02 6.485818e+02 
+.   SIGMA[1,1]   SIGMA[2,2] 
+. 2.997297e+01 4.082483e+01
 ```
 
 
@@ -1013,8 +1019,10 @@ get_rse(FIM2, poped_db2)
 ```
 
 ```
-.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] SIGMA[2,2] 
-.   15.48778  142.08530  223.35925   50.88485  418.53695  549.75962   29.68444   40.82396
+.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
+.   15.48778  142.08530  223.35925   50.88485  418.53695  549.75962   29.68444 
+. SIGMA[2,2] 
+.   40.82396
 ```
 
 ???
@@ -1121,8 +1129,10 @@ get_rse(FIM_extra_ss, poped_db_extra_ss)
 ```
 
 ```
-.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] SIGMA[2,2] 
-.   13.38487   80.99149  119.36373   46.82132  253.41994  288.82097   24.18497   40.80823
+.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
+.   13.38487   80.99149  119.36373   46.82132  253.41994  288.82097   24.18497 
+. SIGMA[2,2] 
+.   40.80823
 ```
 
 ---
@@ -1195,8 +1205,10 @@ get_rse(FIM_final, poped_db_final)
 ```
 
 ```
-.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] SIGMA[2,2] 
-.   12.31062   86.75053  136.64068   50.42738  317.03881  419.93344   29.55819   28.95827
+.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
+.   12.31062   86.75053  136.64068   50.42738  317.03881  419.93344   29.55819 
+. SIGMA[2,2] 
+.   28.95827
 ```
 
 ???
@@ -1269,8 +1281,10 @@ get_rse(FIM_practical, poped_db_practical)
 ```
 
 ```
-.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] SIGMA[2,2] 
-.   10.15307   19.61044   22.79548   48.67831   97.63716   74.56113   26.52843   40.69749
+.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
+.   10.15307   19.61044   22.79548   48.67831   97.63716   74.56113   26.52843 
+. SIGMA[2,2] 
+.   40.69749
 ```
 
 ???
@@ -1388,10 +1402,10 @@ run_model &lt;- function(.design_dir, .run_num) {
 get_est &lt;- function(.design_dir) {
   est &lt;- map_dfr(seq_len(n_rep), function(.run_num) {
 *   mod &lt;- read_model(paste0(.run_num, ".yaml"), .directory = .design_dir)
-*   mod_sum &lt;- try(mod %&gt;% model_summary(), silent = TRUE)
+*   mod_sum &lt;- try(model_summary(mod), silent = TRUE)
     if (inherits(mod_sum, "try-error")) return(NULL)
-    mod_sum %&gt;% 
-      param_estimates() %&gt;% 
+*   mod_sum %&gt;%
+*     param_estimates() %&gt;%
       filter(fixed == 0) %&gt;% 
       select(param = names, estimate) %&gt;% 
       mutate(rep = .run_num)
@@ -1408,7 +1422,7 @@ get_est &lt;- function(.design_dir) {
 
 ---
 
-# SSE: Results for our example
+# SSE Results
 
 .pull-left[
 &lt;img src="slides_files/figure-html/unnamed-chunk-41-1.png" width="100%" /&gt;
@@ -1489,7 +1503,7 @@ class: inverse, center, middle
 # Study design and model
 
 .pull-left[
-Fakinumab is being studied in humans for the first time.
+**Fakinumab** is being studied in humans for the first time.
 
 * Single IV bolus doses of fakinumab: 0.03, 0.1, 0.3, 1, 3, and 10 mg.
 * 6 subjects per dose group will be on active drug.
@@ -1639,8 +1653,10 @@ get_rse(FIM_mrg, poped_db_mrg)
 ```
 
 ```
-.    bpop[1]    bpop[2]    bpop[3]    bpop[4]    bpop[5]    bpop[6]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-.  10.874298  10.660146   7.935583   6.355286   8.894680   3.620177  38.989274  32.096499  31.667628  10.775830
+.    bpop[1]    bpop[2]    bpop[3]    bpop[4]    bpop[5]    bpop[6]     D[1,1] 
+.  10.874541  10.660202   7.935122   6.355306   8.894763   3.620234  38.990317 
+.     D[2,2]     D[3,3] SIGMA[1,1] 
+.  32.096512  31.668012  10.775738
 ```
 
 ---
@@ -1768,7 +1784,7 @@ class: inverse, center, middle
 
 .pull-left[
 
-* QD SC doses of filgrastim: 1, 3, and 10 &amp;mu;g/kg.
+* QD SC doses of **filgrastim**: 1, 3, and 10 &amp;mu;g/kg.
 
 * 10 subjects per dose group will be on active drug.
 
@@ -1777,7 +1793,7 @@ class: inverse, center, middle
 
 .pull-right[
 
-&lt;img src="pics/gcsf_paper.png" width="681" /&gt;
+![](pics/gcsf_paper.png)&lt;!-- --&gt;
 
 * PK/PD model from DDMORE .font-80[http://repository.ddmore.eu/model/DDMODEL00000077.6]
 
@@ -1820,10 +1836,12 @@ get_rse(FIM_gcsf, poped_db_gcsf)
 
 
 ```
-.    bpop[2]    bpop[5]    bpop[6]    bpop[7]    bpop[8]    bpop[9]   bpop[11]   bpop[13]   bpop[14]   bpop[15]   bpop[16]   bpop[17]     D[1,1] 
-.   3.289140  13.518742  12.604107   8.265412   3.822461  19.528269   4.066511  17.017908  10.771361  20.851250   8.289988   7.664966  26.961113 
-.     D[2,2]     D[3,3]     D[5,5]     D[6,6]     D[7,7] SIGMA[1,1] SIGMA[3,3] SIGMA[4,4] 
-.  32.644613  31.369081  41.941250  29.156946  26.406506   3.900224   6.541108   7.713365
+.    bpop[2]    bpop[5]    bpop[6]    bpop[7]    bpop[8]    bpop[9]   bpop[11] 
+.   3.289140  13.518742  12.604107   8.265412   3.822461  19.528269   4.066511 
+.   bpop[13]   bpop[14]   bpop[15]   bpop[16]   bpop[17]     D[1,1]     D[2,2] 
+.  17.017908  10.771361  20.851250   8.289988   7.664966  26.961113  32.644613 
+.     D[3,3]     D[5,5]     D[6,6]     D[7,7] SIGMA[1,1] SIGMA[3,3] SIGMA[4,4] 
+.  31.369081  41.941250  29.156946  26.406506   3.900224   6.541108   7.713365
 ```
 
 ---
@@ -1987,25 +2005,37 @@ Image credit: [Flickr](https://www.flickr.com/photos/dmuth/6039404304)
 
 # References
 
-Foracchia, M, A. Hooker, P. Vicini, et al. (2004). "POPED, a software for optimal experiment design in population kinetics". In:
-_Comput. Methods Programs Biomed._ 74.1, pp. 29-46.
+Foracchia, M, A. Hooker, P. Vicini, et al. (2004). "POPED, a software
+for optimal experiment design in population kinetics". In: _Comput.
+Methods Programs Biomed._ 74.1, pp. 29-46.
 
-Krzyzanski, W, P. Wiczling, P. Lowe, et al. (2010). "Population modeling of filgrastim PK-PD in healthy adults following intravenous
-and subcutaneous administrations". In: _J. Clin. Pharmacol._ 50.9 Suppl, pp. 101S-112S.
+Krzyzanski, W, P. Wiczling, P. Lowe, et al. (2010). "Population
+modeling of filgrastim PK-PD in healthy adults following intravenous
+and subcutaneous administrations". In: _J. Clin. Pharmacol._ 50.9
+Suppl, pp. 101S-112S.
 
-Mentre, F, A. Mallet, and D. Baccar (1997). "Optimal design in random-effects regression models". In: _Biometrika_ 84.2, pp. 429-442.
+Mentre, F, A. Mallet, and D. Baccar (1997). "Optimal design in
+random-effects regression models". In: _Biometrika_ 84.2, pp.
+429-442.
 
-Nyberg, J, C. Bazzoli, K. Ogungbenro, et al. (2014). "Methods and software tools for design evaluation for population
-pharmacokinetics-pharmacodynamics studies". In: _Br. J. Clin. Pharmacol._.
+Nyberg, J, C. Bazzoli, K. Ogungbenro, et al. (2014). "Methods and
+software tools for design evaluation for population
+pharmacokinetics-pharmacodynamics studies". In: _Br. J. Clin.
+Pharmacol._.
 
-Nyberg, J, S. Ueckert, E. A. Strömberg, et al. (2012). "PopED: an extended, parallelized, nonlinear mixed effects models optimal design
+Nyberg, J, S. Ueckert, E. A. Strömberg, et al. (2012). "PopED: an
+extended, parallelized, nonlinear mixed effects models optimal design
 tool". In: _Comput. Methods Programs Biomed._ 108.2, pp. 789-805.
 
-Retout, S, S. Duffull, and F. Mentre (2001). "Development and implementation of the population Fisher information matrix for the
-evaluation of population pharmacokinetic designs". In: _Comput. Methods Programs Biomed._ 65.2, pp. 141-151.
+Retout, S, S. Duffull, and F. Mentre (2001). "Development and
+implementation of the population Fisher information matrix for the
+evaluation of population pharmacokinetic designs". In: _Comput.
+Methods Programs Biomed._ 65.2, pp. 141-151.
 
-Retout, S. and F. Mentre (2003). "Further developments of the Fisher information matrix in nonlinear mixed effects models with
-evaluation in population pharmacokinetics". In: _J. Biopharm. Stat._ 13.2, pp. 209-227.
+Retout, S. and F. Mentre (2003). "Further developments of the Fisher
+information matrix in nonlinear mixed effects models with evaluation
+in population pharmacokinetics". In: _J. Biopharm. Stat._ 13.2, pp.
+209-227.
 
 ---
 
@@ -2062,32 +2092,6 @@ if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
     deleted = true;
   });
 })();
-(function() {
-  "use strict"
-  // Replace <script> tags in slides area to make them executable
-  var scripts = document.querySelectorAll(
-    '.remark-slides-area .remark-slide-container script'
-  );
-  if (!scripts.length) return;
-  for (var i = 0; i < scripts.length; i++) {
-    var s = document.createElement('script');
-    var code = document.createTextNode(scripts[i].textContent);
-    s.appendChild(code);
-    var scriptAttrs = scripts[i].attributes;
-    for (var j = 0; j < scriptAttrs.length; j++) {
-      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
-    }
-    scripts[i].parentElement.replaceChild(s, scripts[i]);
-  }
-})();
-(function() {
-  var links = document.getElementsByTagName('a');
-  for (var i = 0; i < links.length; i++) {
-    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
-      links[i].target = '_blank';
-    }
-  }
-})();
 // adds .remark-code-has-line-highlighted class to <pre> parent elements
 // of code chunks containing highlighted lines with class .remark-code-line-highlighted
 (function(d) {
@@ -2105,6 +2109,17 @@ if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
   }
   preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
 })(document);</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
 
 <script>
 slideshow._releaseMath = function(el) {

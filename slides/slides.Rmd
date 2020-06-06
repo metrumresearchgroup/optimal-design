@@ -1,7 +1,7 @@
 ---
 title: "A Gentle Introduction to Optimal Design for Pharmacometric Models"
 subtitle: "with PopED and mrgsolve"
-author: "Tim Waterhouse and Kyle Baron"
+author: "Tim Waterhouse"
 institute: "Metrum Research Group"
 date: "8 June, 2020"
 output:
@@ -47,7 +47,7 @@ class: title-slide
 # A Gentle Introduction to Optimal Design <br/> for Pharmacometric Models
 ## with PopED and mrgsolve
 
-## Tim Waterhouse and Kyle Baron <br/> Metrum Research Group
+## Tim Waterhouse <br/> Metrum Research Group
 ## 8 June, 2020
 
 ---
@@ -202,11 +202,11 @@ when $\hat{\mathbf{\Psi}}$ is an unbiased estimator of $\mathbf{\Psi}$.
 
 --
 
-* Relative standard errors (RSEs) can be obtained from the diagonals of the inverse of the FIM
+* Lower bounds for elative standard errors (RSEs) can be obtained from the diagonals of the inverse of the FIM
 
 --
 
-* This means we have a quick way of evaluating (a lower bound on) the precision of our parameter estimates.
+* This means we have a quick way of evaluating (lower bounds on) the precision of our parameter estimates.
 
 --
 
@@ -223,7 +223,7 @@ As the name implies, optimal designs are experimental designs that are optimal w
 
 .pull-left[
 $$
-\mathrm{cov}(\hat{\mathbf{\Psi}}) \geq  M_F(\mathbf{\Psi},\xi)
+\mathrm{cov}(\hat{\mathbf{\Psi}}) \geq  \left[M_F(\mathbf{\Psi},\xi)\right]^{-1}
 $$
 ]
 
@@ -432,6 +432,10 @@ tibble(x = seq(0, 24, length = 50)) %>%
 {{content}}
 ]
 
+???
+
+* Instead of sampling at 9 hours, can specify "between 8 and 10 hours"
+
 --
 
 * Even without optimisation, we can't always collect samples at precise times
@@ -500,7 +504,7 @@ class: inverse, center, middle
 .pull-left[
 **Mockdrozaline** has been studied in adult subjects, and we now must design a study in pediatric patients.
 
-The primary objective is to evaluate the PK in this new population, but PK sampling is necessarily sparse.
+A study objective is to evaluate the PK in this new population, but PK sampling is necessarily sparse.
 
 Our mission is to ensure that these samples are timed such that we can sufficiently estimate the PK parameters in pediatric patients.
 ]
@@ -1404,10 +1408,10 @@ run_model <- function(.design_dir, .run_num) {
 get_est <- function(.design_dir) {
   est <- map_dfr(seq_len(n_rep), function(.run_num) {
     mod <- read_model(paste0(.run_num, ".yaml"), .directory = .design_dir) #<<
-    mod_sum <- try(mod %>% model_summary(), silent = TRUE) #<<
+    mod_sum <- try(model_summary(mod), silent = TRUE) #<<
     if (inherits(mod_sum, "try-error")) return(NULL)
-    mod_sum %>% 
-      param_estimates() %>% 
+    mod_sum %>% #<<
+      param_estimates() %>% #<<
       filter(fixed == 0) %>% 
       select(param = names, estimate) %>% 
       mutate(rep = .run_num)
@@ -1424,7 +1428,7 @@ get_est <- function(.design_dir) {
 
 ---
 
-# SSE: Results for our example
+# SSE Results
 
 .pull-left[
 ```{r echo=FALSE, fig.height=4, fig.width=4, out.width='100%'}
@@ -1478,7 +1482,7 @@ class: inverse, center, middle
 # Study design and model
 
 .pull-left[
-Fakinumab is being studied in humans for the first time.
+**Fakinumab** is being studied in humans for the first time.
 
 * Single IV bolus doses of fakinumab: 0.03, 0.1, 0.3, 1, 3, and 10 mg.
 * 6 subjects per dose group will be on active drug.
@@ -1713,7 +1717,7 @@ class: inverse, center, middle
 
 .pull-left[
 
-* QD SC doses of filgrastim: 1, 3, and 10 &mu;g/kg.
+* QD SC doses of **filgrastim**: 1, 3, and 10 &mu;g/kg.
 
 * 10 subjects per dose group will be on active drug.
 
