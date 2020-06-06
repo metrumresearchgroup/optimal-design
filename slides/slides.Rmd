@@ -227,7 +227,7 @@ when $\hat{\mathbf{\Psi}}$ is an unbiased estimator of $\mathbf{\Psi}$.
 
 --
 
-* Lower bounds for elative standard errors (RSEs) can be obtained from the diagonals of the inverse of the FIM
+* Lower bounds for relative standard errors (RSEs) can be obtained from the diagonals of the inverse of the FIM
 
 --
 
@@ -363,7 +363,7 @@ Image credit: [Flickr](https://www.flickr.com/photos/msbhaven/7404593082)
 
 --
 
-* Usually we have adequate information on parameters estimates
+* Usually we have adequate information on parameter estimates
 {{content}}
 
 --
@@ -1076,7 +1076,7 @@ poped_db <- create.poped.database(
 * `xt`: initial sampling design
 
 * `minxt`: lower bound
-* `maxxt`: lower bound
+* `maxxt`: upper bound
 
 * `model_switch`: associate sampling times with model
 ]
@@ -2111,8 +2111,75 @@ PrintBibliography(myBib)
 
 ---
 
+class: center, middle
 
-https://www.flickr.com/photos/dok1/3581901453
-https://www.flickr.com/photos/bucky1105/2334669404
-https://www.flickr.com/photos/lalonsorm/16856604020
-https://www.flickr.com/photos/gmanviz/48835009102
+# Thank you
+
+---
+
+class: inverse, center, middle
+
+# Backup slides
+
+---
+
+# SSE: `template.csv`
+
+```
+$PROB RUN# run_num
+$INPUT ID TIME EVID MDV CMT AMT SS II DV WT
+$DATA data_fname IGNORE=@
+...
+$SIMULATION (run_num)
+$ESTIMATION METHOD=1 INTER PRINT=1 MSFO=./run_num.msf
+```
+
+---
+
+# SSE: Run the models with `rbabylon`
+
+```{r eval=FALSE}
+run_model <- function(.design_dir, .run_num) {
+  # Modify and write the control stream
+  ctl_template %>% 
+    str_replace("run_num", as.character(.run_num)) %>% 
+    str_replace("data_fname", paste0("../", .run_num, ".csv")) %>% 
+    writeLines(file.path(.design_dir, paste0(.run_num, ".ctl")))
+  
+  # Run the model
+  new_model( #<<
+    .yaml_path = paste0(.run_num, ".yaml"), #<<
+    .description = .run_num, #<<
+    .directory = design_dir #<<
+  ) %>% #<<
+    submit_model() #<<
+}
+```
+
+---
+
+# SSE: Collect the results with `rbabylon`
+
+```{r eval=FALSE}
+get_est <- function(.design_dir) {
+  est <- map_dfr(seq_len(n_rep), function(.run_num) {
+    mod <- read_model(paste0(.run_num, ".yaml"), .directory = .design_dir) #<<
+    mod_sum <- try(model_summary(mod), silent = TRUE) #<<
+    if (inherits(mod_sum, "try-error")) return(NULL)
+    mod_sum %>% #<<
+      param_estimates() %>% #<<
+      filter(fixed == 0) %>% 
+      select(param = names, estimate) %>% 
+      mutate(rep = .run_num)
+  }) %>% 
+    left_join(true_vals) %>% 
+    mutate(
+      param = factor(param, levels = unique(.[["param"]])),
+      pct_bias = (estimate - value) / abs(value) * 100
+    ) %>% 
+    filter(abs(pct_bias) < 5000)
+  return(est)
+}
+```
+
+---

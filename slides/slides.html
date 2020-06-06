@@ -199,7 +199,7 @@ when `\(\hat{\mathbf{\Psi}}\)` is an unbiased estimator of `\(\mathbf{\Psi}\)`.
 
 --
 
-* Lower bounds for elative standard errors (RSEs) can be obtained from the diagonals of the inverse of the FIM
+* Lower bounds for relative standard errors (RSEs) can be obtained from the diagonals of the inverse of the FIM
 
 --
 
@@ -321,7 +321,7 @@ Retout and Mentre (2003)]
 
 --
 
-* Usually we have adequate information on parameters estimates
+* Usually we have adequate information on parameter estimates
 {{content}}
 
 --
@@ -947,7 +947,7 @@ poped_db &lt;- create.poped.database(
 * `xt`: initial sampling design
 
 * `minxt`: lower bound
-* `maxxt`: lower bound
+* `maxxt`: upper bound
 
 * `model_switch`: associate sampling times with model
 ]
@@ -2013,11 +2013,80 @@ in population pharmacokinetics". In: _J. Biopharm. Stat._ 13.2, pp.
 
 ---
 
+class: center, middle
 
-https://www.flickr.com/photos/dok1/3581901453
-https://www.flickr.com/photos/bucky1105/2334669404
-https://www.flickr.com/photos/lalonsorm/16856604020
-https://www.flickr.com/photos/gmanviz/48835009102
+# Thank you
+
+---
+
+class: inverse, center, middle
+
+# Backup slides
+
+---
+
+# SSE: `template.csv`
+
+```
+$PROB RUN# run_num
+$INPUT ID TIME EVID MDV CMT AMT SS II DV WT
+$DATA data_fname IGNORE=@
+...
+$SIMULATION (run_num)
+$ESTIMATION METHOD=1 INTER PRINT=1 MSFO=./run_num.msf
+```
+
+---
+
+# SSE: Run the models with `rbabylon`
+
+
+```r
+run_model &lt;- function(.design_dir, .run_num) {
+  # Modify and write the control stream
+  ctl_template %&gt;% 
+    str_replace("run_num", as.character(.run_num)) %&gt;% 
+    str_replace("data_fname", paste0("../", .run_num, ".csv")) %&gt;% 
+    writeLines(file.path(.design_dir, paste0(.run_num, ".ctl")))
+  
+  # Run the model
+* new_model(
+*   .yaml_path = paste0(.run_num, ".yaml"),
+*   .description = .run_num,
+*   .directory = design_dir
+* ) %&gt;%
+*   submit_model()
+}
+```
+
+---
+
+# SSE: Collect the results with `rbabylon`
+
+
+```r
+get_est &lt;- function(.design_dir) {
+  est &lt;- map_dfr(seq_len(n_rep), function(.run_num) {
+*   mod &lt;- read_model(paste0(.run_num, ".yaml"), .directory = .design_dir)
+*   mod_sum &lt;- try(model_summary(mod), silent = TRUE)
+    if (inherits(mod_sum, "try-error")) return(NULL)
+*   mod_sum %&gt;%
+*     param_estimates() %&gt;%
+      filter(fixed == 0) %&gt;% 
+      select(param = names, estimate) %&gt;% 
+      mutate(rep = .run_num)
+  }) %&gt;% 
+    left_join(true_vals) %&gt;% 
+    mutate(
+      param = factor(param, levels = unique(.[["param"]])),
+      pct_bias = (estimate - value) / abs(value) * 100
+    ) %&gt;% 
+    filter(abs(pct_bias) &lt; 5000)
+  return(est)
+}
+```
+
+---
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
