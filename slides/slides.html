@@ -4,9 +4,9 @@
     <title>A Gentle Introduction to Optimal Design for Pharmacometric Models</title>
     <meta charset="utf-8" />
     <meta name="author" content="Tim Waterhouse" />
-    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
-    <link href="libs/remark-css-0.0.1/default-fonts.css" rel="stylesheet" />
-    <script src="libs/kePrint-0.0.1/kePrint.js"></script>
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <script src="libs/kePrint/kePrint.js"></script>
     <link rel="stylesheet" href="tweaks.css" type="text/css" />
   </head>
   <body>
@@ -45,7 +45,9 @@ pre {
 background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/4422/36449778360_8683e16f7f_k_d.jpg)
 background-size: cover
   
-# Why listen to this talk?
+# Why are we here?
+
+--
 
 .pull-left[
 * You want to design a study
@@ -81,18 +83,41 @@ background-size: cover
 
 * Optimal design background
 
+--
+
 * Software tools
+
+--
 
 * Simple model with `PopED`
     + Evaluation
     + Optimization
     + Simulation
 
+--
+
 * More complex models with `PopED` and `mrgsolve`
 
 ???
 
 Image credit: [Flickr](https://www.flickr.com/photos/davidden/70342823/)
+
+---
+
+background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/3061/2599260050_539b8904c7_k_d.jpg)
+background-size: cover
+  
+# Acknowledgements
+
+.pull-left[
+* Kyle Baron
+
+* Devin Pastoor
+]
+
+???
+
+Image credit: [Flickr](https://www.flickr.com/photos/tinahesmansaey/2599260050)
 
 ---
 
@@ -284,27 +309,20 @@ Image credit: [Flickr](https://www.flickr.com/photos/msbhaven/7404593082)
 Retout, Duffull, and Mentre (2001)&lt;/br&gt;
 Retout and Mentre (2003)]
 
-???
-
-More often than not, we're dealing with nonlinear mixed effects (NLME) models.  Since the FIM depends on the likelihood function, and there is sadly no analytic expression for the likelihood in NLME models, we must rely on approximations.  See Mentre1997-ds, Retout2001-lw, and Retout2003-jx for FIM approximations available to us.
-
-So our FIM is
-
-* an approximation
-* to a lower bound
-* that depends on the parameter values.
-
----
-
-background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/3061/2599260050_539b8904c7_k_d.jpg)
-background-size: cover
-  
-# All is not lost
-
-.pull-left[
-* Usually we have adequate information on parameters estimates
+.pull-right[
+* But...
 {{content}}
 ]
+
+--
+
+* All is not lost
+{{content}}
+
+--
+
+* Usually we have adequate information on parameters estimates
+{{content}}
 
 --
 
@@ -318,11 +336,17 @@ background-size: cover
 
 ???
 
+More often than not, we're dealing with nonlinear mixed effects (NLME) models.  Since the FIM depends on the likelihood function, and there is sadly no analytic expression for the likelihood in NLME models, we must rely on approximations.  See Mentre1997-ds, Retout2001-lw, and Retout2003-jx for FIM approximations available to us.
+
+So our FIM is
+
+* an approximation
+* to a lower bound
+* that depends on the parameter values.
+
 How useful could that even be?  Pretty useful, actually.  In most cases you'll probably find that you have adequate information on parameter estimates and that these approximate lower bounds aren't too far off what you'll get from simulations.
 
 Either way, I **strongly** recommend that any optimal design exercise is capped off with confirmatory simulations using the tool (e.g. NONMEM) that you'll be using in the actual analysis of the data.
-
-Image credit: [Flickr](https://www.flickr.com/photos/tinahesmansaey/2599260050)
 
 ---
 
@@ -547,24 +571,36 @@ class: poll-slide
 
 
 .pull-left[
-1. 1, 24, 48, 96 hours
-
-2. 4, 24, 48, 96 hours
-
-3. 6, 24, 48, 96 hours
-
-4. 12, 24, 48, 96 hours
-
-5. My kid came looking for snacks and I missed everything you just said.
-
-`\(t_\textrm{max} \approx\)` 6 hours
-]
-
-.pull-right[
 &lt;img src="slides_files/figure-html/unnamed-chunk-13-1.png" width="90%" /&gt;
 ]
 
-.footnote[[*]According to `PopED`]
+.footnote[[*]According to `PopED` &lt;/br&gt;
+`\(t_\textrm{max} \approx\)` 6 hours]
+
+.pull-right[
+1. 1, 24, 48, 96 hours
+{{content}}
+]
+
+--
+
+2. 4, 24, 48, 96 hours
+{{content}}
+
+--
+
+3. 6, 24, 48, 96 hours
+{{content}}
+
+--
+
+4. 12, 24, 48, 96 hours
+{{content}}
+
+--
+
+5. My kid came looking for snacks and I missed everything you just said.
+{{content}}
 
 ---
 
@@ -1723,6 +1759,7 @@ class: inverse, center, middle
 * PK/PD model from DDMORE .font-80[http://repository.ddmore.eu/model/DDMODEL00000077.6]
 
 * NONMEM model translated to `mrgsolve`
+.font-80[https://github.com/mrgsolve/depot/blob/master/vignette/gcsf.md]
 ]
 
 .footnote[Krzyzanski, Wiczling, Lowe, et al. (2010)]
@@ -1751,8 +1788,6 @@ class: inverse, center, middle
 
 
 
-TODO add a snippet of create.poped.database to show discrete covariates.
-
 
 ```r
 FIM_gcsf &lt;- evaluate.fim(poped_db_gcsf)
@@ -1775,25 +1810,39 @@ class: poll-slide
 
 # Poll Question #3
 
-## Any better doses for estimating `\(SC_{50}\)` or `\(S_\textrm{max}\)`s?
+## Any better doses for estimating SC50 or Smax?
 
 
 
 .pull-left[
-1. 1, 3, 10 &amp;mu;g/kg
-
-2. 0.3, 1, 3 &amp;mu;g/kg
-
-3. 0.3, 1, 10 &amp;mu;g/kg
-
-4. 0.1, 1, 3 &amp;mu;g/kg
-
-5. Are you still talking? I think you're on mute.
+&lt;img src="slides_files/figure-html/unnamed-chunk-59-1.png" width="100%" /&gt;
 ]
 
 .pull-right[
-&lt;img src="slides_files/figure-html/unnamed-chunk-59-1.png" width="100%" /&gt;
+1. 1, 3, 10 &amp;mu;g/kg
+{{content}}
 ]
+
+--
+
+2. 0.3, 1, 3 &amp;mu;g/kg
+{{content}}
+
+--
+
+3. 0.3, 1, 10 &amp;mu;g/kg
+{{content}}
+
+--
+
+4. 0.1, 1, 3 &amp;mu;g/kg
+{{content}}
+
+--
+
+5. Are you still talking? I think you're on mute.
+{{content}}
+
 
 ---
 

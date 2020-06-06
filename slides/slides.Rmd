@@ -70,7 +70,9 @@ pre {
 background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/4422/36449778360_8683e16f7f_k_d.jpg)
 background-size: cover
   
-# Why listen to this talk?
+# Why are we here?
+
+--
 
 .pull-left[
 * You want to design a study
@@ -106,18 +108,41 @@ background-size: cover
 
 * Optimal design background
 
+--
+
 * Software tools
+
+--
 
 * Simple model with `PopED`
     + Evaluation
     + Optimization
     + Simulation
 
+--
+
 * More complex models with `PopED` and `mrgsolve`
 
 ???
 
 Image credit: [Flickr](https://www.flickr.com/photos/davidden/70342823/)
+
+---
+
+background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/3061/2599260050_539b8904c7_k_d.jpg)
+background-size: cover
+  
+# Acknowledgements
+
+.pull-left[
+* Kyle Baron
+
+* Devin Pastoor
+]
+
+???
+
+Image credit: [Flickr](https://www.flickr.com/photos/tinahesmansaey/2599260050)
 
 ---
 
@@ -326,27 +351,20 @@ Image credit: [Flickr](https://www.flickr.com/photos/msbhaven/7404593082)
 `r Citet(myBib, "Retout2001-lw")`</br>
 `r Citet(myBib, "Retout2003-jx")`]
 
-???
-
-More often than not, we're dealing with nonlinear mixed effects (NLME) models.  Since the FIM depends on the likelihood function, and there is sadly no analytic expression for the likelihood in NLME models, we must rely on approximations.  See Mentre1997-ds, Retout2001-lw, and Retout2003-jx for FIM approximations available to us.
-
-So our FIM is
-
-* an approximation
-* to a lower bound
-* that depends on the parameter values.
-
----
-
-background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/3061/2599260050_539b8904c7_k_d.jpg)
-background-size: cover
-  
-# All is not lost
-
-.pull-left[
-* Usually we have adequate information on parameters estimates
+.pull-right[
+* But...
 {{content}}
 ]
+
+--
+
+* All is not lost
+{{content}}
+
+--
+
+* Usually we have adequate information on parameters estimates
+{{content}}
 
 --
 
@@ -360,11 +378,17 @@ background-size: cover
 
 ???
 
+More often than not, we're dealing with nonlinear mixed effects (NLME) models.  Since the FIM depends on the likelihood function, and there is sadly no analytic expression for the likelihood in NLME models, we must rely on approximations.  See Mentre1997-ds, Retout2001-lw, and Retout2003-jx for FIM approximations available to us.
+
+So our FIM is
+
+* an approximation
+* to a lower bound
+* that depends on the parameter values.
+
 How useful could that even be?  Pretty useful, actually.  In most cases you'll probably find that you have adequate information on parameter estimates and that these approximate lower bounds aren't too far off what you'll get from simulations.
 
 Either way, I **strongly** recommend that any optimal design exercise is capped off with confirmatory simulations using the tool (e.g. NONMEM) that you'll be using in the actual analysis of the data.
-
-Image credit: [Flickr](https://www.flickr.com/photos/tinahesmansaey/2599260050)
 
 ---
 
@@ -616,20 +640,6 @@ designs <- bind_cols(
 ```
 
 .pull-left[
-1. `r designs %>% dplyr::filter(design == "Design 1") %>% pull(xt)` hours
-
-2. `r designs %>% dplyr::filter(design == "Design 2") %>% pull(xt)` hours
-
-3. `r designs %>% dplyr::filter(design == "Design 3") %>% pull(xt)` hours
-
-4. `r designs %>% dplyr::filter(design == "Design 4") %>% pull(xt)` hours
-
-5. My kid came looking for snacks and I missed everything you just said.
-
-$t_\textrm{max} \approx$ 6 hours
-]
-
-.pull-right[
 ```{r echo=FALSE, out.width='90%', fig.width=5, fig.height=3}
 tibble(xt = seq(0, 96, by = 1)) %>% 
   mutate(y = pk(xt, dose = 1e4, dose_times = 0)) %>% 
@@ -645,7 +655,33 @@ tibble(xt = seq(0, 96, by = 1)) %>%
 ```
 ]
 
-.footnote[[*]According to `PopED`]
+.footnote[[*]According to `PopED` </br>
+$t_\textrm{max} \approx$ 6 hours]
+
+.pull-right[
+1. `r designs %>% dplyr::filter(design == "Design 1") %>% pull(xt)` hours
+{{content}}
+]
+
+--
+
+2. `r designs %>% dplyr::filter(design == "Design 2") %>% pull(xt)` hours
+{{content}}
+
+--
+
+3. `r designs %>% dplyr::filter(design == "Design 3") %>% pull(xt)` hours
+{{content}}
+
+--
+
+4. `r designs %>% dplyr::filter(design == "Design 4") %>% pull(xt)` hours
+{{content}}
+
+--
+
+5. My kid came looking for snacks and I missed everything you just said.
+{{content}}
 
 ---
 
@@ -1658,6 +1694,7 @@ knitr::include_graphics("pics/gcsf_paper.png")
 * PK/PD model from DDMORE .font-80[http://repository.ddmore.eu/model/DDMODEL00000077.6]
 
 * NONMEM model translated to `mrgsolve`
+.font-80[https://github.com/mrgsolve/depot/blob/master/vignette/gcsf.md]
 ]
 
 .footnote[`r Citet(myBib, "Krzyzanski2010-dg")`]
@@ -1687,7 +1724,8 @@ sim_gcsf <- mod_gcsf %>% mrgsim_df(e,  end = 240)
 sim_gcsf %>%
   left_join(tibble(dose = doses, ID = seq_along(doses))) %>% 
   select(dose, time, PK = CP, ANC = RESP) %>% 
-  mutate(dose = paste0(dose, " μg/kg")) %>% 
+  mutate(dose = factor(paste0(dose, " μg/kg"),
+                       levels = paste0(rev(sort(doses)), " μg/kg"))) %>% 
   gather("response", "value", PK, ANC) %>% 
   mutate(response = factor(response, levels = c("PK", "ANC"))) %>% 
   ggplot(aes(time, value, colour = dose)) +
@@ -1881,8 +1919,6 @@ poped_db_gcsf <- create.poped.database(
 )
 ```
 
-TODO add a snippet of create.poped.database to show discrete covariates.
-
 ```{r eval=FALSE}
 FIM_gcsf <- evaluate.fim(poped_db_gcsf)
 get_rse(FIM_gcsf, poped_db_gcsf)
@@ -1899,7 +1935,7 @@ class: poll-slide
 
 # Poll Question #3
 
-## Any better doses for estimating $SC_{50}$ or $S_\textrm{max}$s?
+## Any better doses for estimating SC50 or Smax?
 
 ```{r echo=FALSE}
 designs <- bind_cols(
@@ -1912,23 +1948,12 @@ designs <- bind_cols(
 ```
 
 .pull-left[
-1. `r designs %>% dplyr::filter(design == "Design 1") %>% pull(dose)` &mu;g/kg
-
-2. `r designs %>% dplyr::filter(design == "Design 2") %>% pull(dose)` &mu;g/kg
-
-3. `r designs %>% dplyr::filter(design == "Design 3") %>% pull(dose)` &mu;g/kg
-
-4. `r designs %>% dplyr::filter(design == "Design 4") %>% pull(dose)` &mu;g/kg
-
-5. Are you still talking? I think you're on mute.
-]
-
-.pull-right[
 ```{r echo=FALSE, fig.width=4, fig.height=3, out.width="100%"}
 sim_gcsf %>%
   left_join(tibble(dose = doses, ID = seq_along(doses))) %>% 
   select(dose, time, PK = CP, ANC = RESP) %>% 
-  mutate(dose = paste0(dose, " μg/kg")) %>% 
+  mutate(dose = factor(paste0(dose, " μg/kg"),
+                       levels = paste0(rev(sort(doses)), " μg/kg"))) %>% 
   ggplot(aes(time, ANC, colour = dose)) +
   geom_line() +
   scale_y_log10() +
@@ -1939,6 +1964,32 @@ sim_gcsf %>%
   )
 ```
 ]
+
+.pull-right[
+1. `r designs %>% dplyr::filter(design == "Design 1") %>% pull(dose)` &mu;g/kg
+{{content}}
+]
+
+--
+
+2. `r designs %>% dplyr::filter(design == "Design 2") %>% pull(dose)` &mu;g/kg
+{{content}}
+
+--
+
+3. `r designs %>% dplyr::filter(design == "Design 3") %>% pull(dose)` &mu;g/kg
+{{content}}
+
+--
+
+4. `r designs %>% dplyr::filter(design == "Design 4") %>% pull(dose)` &mu;g/kg
+{{content}}
+
+--
+
+5. Are you still talking? I think you're on mute.
+{{content}}
+
 
 ---
 
