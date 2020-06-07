@@ -634,13 +634,1116 @@ background-size: cover
 * `fg()`, the parameter model (including IIV and IOV);
 
 * `feps()`, the residual error model.
+
+`create.poped.database()` collects together these model functions, parameter values, and everything related to study design.
 ]
+
+
 
 ???
 
 (The names of the functions can be different, but these are the naming conventions used by `PopED`.)  There are built-in `ff()` and `feps()` functions for basic structural models with additive and/or proportional residual error, but you'll need to at least write your own `fg()` function (don't worry, there are examples to get you started).
 
 Image credit: [Flickr](https://www.flickr.com/photos/dmuth/6039404494)
+
+---
+
+# Plot of initial design
+
+.pull-left[
+
+```r
+plot_model_prediction(
+  poped_db,
+  model.names = c("Day 1", "Steady state"),
+  facet_scales = "free_x",
+  model_num_points = 200
+) +
+  labs(x = "Time from dose (h)") +
+  theme_bw()
+```
+]
+
+.pull-right[
+![](slides_files/figure-html/test-plot-1-1.png)
+]
+
+???
+
+`PopED` includes a function to generate a quick test plot showing the typical response(s), along with the initial sampling times.
+
+---
+
+# Evaluate FIM
+
+
+```r
+FIM &lt;- evaluate.fim(poped_db) 
+det(FIM)
+```
+
+```
+. [1] 0.04804071
+```
+
+
+```r
+get_rse(FIM, poped_db)
+```
+
+```
+.      bpop[1]      bpop[2]      bpop[3]       D[1,1]       D[2,2]       D[3,3] 
+. 2.983306e+05 3.132072e+06 4.936333e+06 5.192188e+01 4.888612e+02 6.485818e+02 
+.   SIGMA[1,1]   SIGMA[2,2] 
+. 2.997297e+01 4.082483e+01
+```
+
+
+```r
+poped_db2 &lt;- create.poped.database( poped_db, xt = c(5, c(23, 24, 24, 168)) )
+FIM2 &lt;- evaluate.fim(poped_db2) 
+get_rse(FIM2, poped_db2)
+```
+
+```
+.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
+.   15.48778  142.08530  223.35925   50.88485  418.53695  549.75962   29.68444 
+. SIGMA[2,2] 
+.   40.82396
+```
+
+???
+
+This determinant is what will be used to optimize the design, but it's not particularly helpful by itself.  What we really need are the predicted standard errors based on the FIM.
+
+The RSEs are crazy high, which suggests that the model is not identifiable.  A slight tweak to a single timepoint (increasing the number of support points) may help.
+
+The RSEs are no longer in the millions, but certainly not as low as we'd hope for. Let's see if we can make any improvements with optimization.
+
+---
+
+# *D*-optimal design: Starting from the original design
+
+.pull-left-40[
+
+```r
+poped_db &lt;- create.poped.database(
+  ...
+  xt = c(5, c(rep(24, 3), 168)),
+  minxt = c(0, c(rep(23, 3), 96)),
+  maxxt = c(6, c(rep(24, 3), 168)),
+  ...
+)
+output &lt;- poped_optim(
+  poped_db,
+  opt_xt = TRUE,
+  parallel = TRUE,
+  parallel_type = "multicore",
+  seed = 1
+)
+summary(output)
+```
+]
+
+.pull-right-60[
+.font-90[
+
+```
+. ===============================================================================
+. FINAL RESULTS
+. Optimized Sampling Schedule
+. Group 1: Model 1: 0.3276
+. Group 1: Model 2:     23     24     24     96
+. 
+. OFV = 20.2291
+. 
+. Efficiency: 
+.   ((exp(ofv_final) / exp(ofv_init))^(1/n_parameters)) = 18.322
+. 
+. Expected relative standard error
+. (%RSE, rounded to nearest integer):
+.     Parameter   Values     RSE_0   RSE
+.       bpop[1]       10    298333    38
+.       bpop[2]      100   3132099   149
+.       bpop[3]     0.25   4936376   153
+.        D[1,1]     0.08        52    50
+.        D[2,2]      0.1       489   204
+.        D[3,3]      0.2       649   127
+.    SIGMA[1,1]     0.05        30    30
+.    SIGMA[2,2]        1        41    41
+. 
+. Total running time: 9.327 seconds
+```
+]
+]
+
+
+???
+
+Better, but still not good enough.
+
+---
+
+# Add another post dose sample at SS
+
+
+
+
+```r
+poped_db_extra_ss &lt;- create.poped.database(
+  ...
+  xt = c(5, c(rep(24, 3), 4, 168)),
+  minxt = c(0, c(rep(23, 3), 0, 96)),
+  maxxt = c(6, c(rep(24, 3), 6, 168)),
+  ...
+)
+```
+
+
+```r
+FIM_extra_ss &lt;- evaluate.fim(poped_db_extra_ss) 
+get_rse(FIM_extra_ss, poped_db_extra_ss)
+```
+
+```
+.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
+.   13.38487   80.99149  119.36373   46.82132  253.41994  288.82097   24.18497 
+. SIGMA[2,2] 
+.   40.80823
+```
+
+???
+
+Add another post dose sample at steady state.
+
+We'll create the PopED database from scratch again.  This is probably easier than updating an old database when you change the number of samples because certain vectors (like `grouped_xt`) are generated automatically if you don't supply the argument and we don't want to fuss with that.
+
+---
+
+# *D*-optimal design: Add another post dose sample at SS
+
+.pull-left-40[
+
+```r
+output_extra_ss &lt;- poped_optim(
+  poped_db_extra_ss,
+  opt_xt = TRUE,
+  parallel = TRUE,
+  parallel_type = "multicore",
+  seed = 1
+)
+summary(output_extra_ss)
+```
+]
+
+.pull-right-60[
+.font-90[
+
+```
+. ===============================================================================
+. FINAL RESULTS
+. Optimized Sampling Schedule
+. Group 1: Model 1:      6
+. Group 1: Model 2: 0.9979     23     23     24     96
+. 
+. OFV = 24.6494
+. 
+. Efficiency: 
+.   ((exp(ofv_final) / exp(ofv_init))^(1/n_parameters)) = 1.6623
+. 
+. Expected relative standard error
+. (%RSE, rounded to nearest integer):
+.     Parameter   Values   RSE_0   RSE
+.       bpop[1]       10      13     9
+.       bpop[2]      100      81    26
+.       bpop[3]     0.25     119    35
+.        D[1,1]     0.08      47    47
+.        D[2,2]      0.1     253   124
+.        D[3,3]      0.2     289   120
+.    SIGMA[1,1]     0.05      24    25
+.    SIGMA[2,2]        1      41    41
+. 
+. Total running time: 12.69 seconds
+```
+]]
+
+---
+
+# Add sample after the final (SS) dose
+
+
+```r
+poped_db_final &lt;- create.poped.database(
+  poped_db_extra_ss,
+  xt = c(5, c(rep(24, 3), 72, 168)),
+  minxt = c(0, c(rep(23, 3), 0, 168)),
+  maxxt = c(6, c(rep(24, 3), 168, 168))
+)
+```
+
+
+```r
+FIM_final &lt;- evaluate.fim(poped_db_final) 
+get_rse(FIM_final, poped_db_final)
+```
+
+```
+.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
+.   12.31062   86.75053  136.64068   50.42738  317.03881  419.93344   29.55819 
+. SIGMA[2,2] 
+.   28.95827
+```
+
+???
+
+Add another sample after the final dose.
+
+This time we can just update the previous PopED database.
+
+---
+
+# *D*-optimal design: Add sample after the final (SS) dose
+
+.pull-left-40[
+
+```r
+output_final &lt;- poped_optim(
+  poped_db_final,
+  opt_xt = TRUE,
+  parallel = TRUE,
+  parallel_type = "multicore",
+  seed = 1
+)
+summary(output_final)
+```
+]
+
+.pull-right-60[
+.font-90[
+
+```
+. ===============================================================================
+. FINAL RESULTS
+. Optimized Sampling Schedule
+. Group 1: Model 1: 0.4454
+. Group 1: Model 2:     23     23     23  41.09    168
+. 
+. OFV = 27.717
+. 
+. Efficiency: 
+.   ((exp(ofv_final) / exp(ofv_init))^(1/n_parameters)) = 2.7831
+. 
+. Expected relative standard error
+. (%RSE, rounded to nearest integer):
+.     Parameter   Values   RSE_0   RSE
+.       bpop[1]       10      12     9
+.       bpop[2]      100      87    14
+.       bpop[3]     0.25     137    17
+.        D[1,1]     0.08      50    48
+.        D[2,2]      0.1     317    74
+.        D[3,3]      0.2     420    63
+.    SIGMA[1,1]     0.05      30    29
+.    SIGMA[2,2]        1      29    39
+. 
+. Total running time: 11.964 seconds
+```
+]]
+
+---
+
+# Near-optimal design
+
+
+```r
+poped_db_practical &lt;- create.poped.database(
+  poped_db_final,
+  xt = c(0.5, rep(24, 3), 32, 168)
+)
+FIM_practical &lt;- evaluate.fim(poped_db_practical) 
+get_rse(FIM_practical, poped_db_practical)
+```
+
+```
+.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
+.   10.15307   19.61044   22.79548   48.67831   97.63716   74.56113   26.52843 
+. SIGMA[2,2] 
+.   40.69749
+```
+
+???
+
+This optimal design serves us well, but it's not very practical to request a sample at 41.09 hours after the final dose.  For a dose at 8 AM, that would mean a sample at around 1 AM.  Instead we'll construct a similar design with more practical times and see how that affects our RSEs.  We can do this by building a new `PopED` database based on the previous one.
+
+This second-to-last sample at 32 hours would be at 4 PM the day after an 8 AM final dose.  More practical, and we don't seem to lose too much in terms of RSE.
+
+---
+
+.pull-left[
+
+```r
+plot_model_prediction(
+  poped_db_practical,
+  model.names = c("Day 1", "Steady state"),
+  facet_scales = "free_x",
+  model_num_points = 200
+) +
+  labs(x = "Time from dose (h)") +
+  theme_bw()
+```
+]
+
+.pull-right[
+![](slides_files/figure-html/test-plot-2-1.png)
+]
+
+---
+
+# Sampling windows
+
+.pull-left[
+
+```r
+plot_efficiency_of_windows(
+  poped_db_practical,
+  xt_plus  = c(0.25, rep(0, 3), 2, 0),
+  xt_minus = c(0.25, rep(1, 3), 2, 4)
+)
+```
+]
+
+.pull-right[
+![](slides_files/figure-html/test-plot-3-1.png)
+]
+
+???
+
+Next, we'll construct windows around our sampling times to provide some flexibility in sampling.  We evaluate the effect of this flexibility on the RSEs.
+
+We'll allow:
+
+* up to 15 minutes before or after the first sample at half an hour (i.e., 15-45 minutes post dose)
+* up to 1 hour before each trough sample (i.e., 0-1 hours pre dose)
+* up to 2 hours before or after the 32-hour sample after the final dose (i.e., 30-34 hours after the final dose)
+* up to 4 hours before the final sample (i.e., 164-168 hours post final dose)
+
+The 100 sets of simulated samples show no significant deviations from the RSEs for the optimal samples.
+
+---
+
+# SSE Results
+
+.pull-left[
+&lt;img src="slides_files/figure-html/unnamed-chunk-31-1.png" width="100%" /&gt;
+]
+
+.pull-right[
+.font-90[
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; param &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; poped_pct_rse &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; sim_pct_rse &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; sim_pct_bias &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; THETA1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10.2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 12.2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4.2 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; THETA2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 19.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 29.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6.7 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; THETA3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 22.8 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 32.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.4 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; OMEGA(1,1) &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 48.7 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 74.2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 41.7 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; OMEGA(2,2) &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 97.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 132.8 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 25.9 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; OMEGA(3,3) &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 74.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 90.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7.2 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; SIGMA(1,1) &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 26.5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 28.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -6.7 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; SIGMA(2,2) &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 40.7 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 41.3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 11.9 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+]]
+
+---
+
+class: inverse, center, middle
+
+# Example: ODE PK model
+
+---
+
+# Study design and model
+
+.pull-left[
+**Fakinumab** is being studied in humans for the first time.
+
+* Single IV bolus doses of fakinumab: 0.03, 0.1, 0.3, 1, 3, and 10 mg.
+* 6 subjects per dose group will be on active drug.
+* Proposed samples: 1 and 4 hours post dose, and 1, 3, 7, 14, 21 days post dose.
+]
+
+.pull-right[
+Based on projections from animal PK data, we predict that a 2-compartment model with linear and nonlinear (Michaelis-Menten) clearance from the central compartment will desribe the data.
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:right;"&gt; CL &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; VMAX &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; KM &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; V1 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; Q &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; V2 &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 0.5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 20 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1.2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2.5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+We include log-normal IIV on `CL`, `VMAX`, and `V1`, and a proportional residual error.
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:right;"&gt; om_CL &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; om_VMAX &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; om_V1 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; sigma_prop &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 0.2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.15 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+]
+
+---
+
+# Model in `mrgsolve`
+
+
+```
+. 
+. Model file:  model_poped.cpp 
+. [ param ]
+. CL = 1, VMAX = 10, KM = 10, V1 = 8, Q = 10, V2 = 100
+. 
+. [ cmt ] CENT PERIPH
+. 
+. [ main ]
+. double ke  = CL/V1;
+. double k12 = Q/V1;
+. double k21 = Q/V2;
+. 
+. [ ode ]
+. double CP = CENT/V1;
+. 
+. dxdt_CENT = k21*PERIPH - k12*CENT - VMAX*CP/(KM + CP) - ke*CENT;
+. dxdt_PERIPH = k12*CENT - k21*PERIPH;
+. 
+. [ capture ]
+. CP
+```
+
+---
+
+# `ff()` for `mrgsolve` model
+
+.pull-left[
+.font-80[
+
+```r
+ff &lt;- function(model_switch, xt, parameters, poped.db) {
+  obs_time &lt;- as.numeric(xt)
+  dose_time &lt;- 0
+  
+  dose &lt;- data.frame(
+    ID = 1, 
+    amt = parameters[["DOSE"]]*1000,
+    cmt = 1, 
+    evid = 1,
+    time = dose_time
+  )
+  obs &lt;- data.frame(
+    ID = 1, 
+    amt = 0, 
+    cmt = 1, 
+    evid = 0, 
+    time = sort(obs_time)
+  )
+```
+]]
+
+.pull-right[
+.font-80[
+
+```r
+  data &lt;- arrange(bind_rows(dose,obs),time)
+
+  mod &lt;- param(mod, parameters)
+  
+  out &lt;- mrgsim_q(mod,data,output="matrix")
+  
+  out &lt;- out[data$evid==0,"CP",drop=FALSE][match(obs_time,obs$time),]
+  
+  return(list(y = out, poped.db = poped.db))
+}
+```
+]]
+
+---
+
+# Plot of initial design
+
+
+
+.center[
+&lt;img src="slides_files/figure-html/unnamed-chunk-39-1.png" width="80%" /&gt;
+]
+
+---
+
+# Evaluate FIM
+
+
+```r
+FIM_mrg &lt;- evaluate.fim(poped_db_mrg) 
+get_rse(FIM_mrg, poped_db_mrg)
+```
+
+```
+.    bpop[1]    bpop[2]    bpop[3]    bpop[4]    bpop[5]    bpop[6]     D[1,1] 
+.  10.874541  10.660202   7.935122   6.355306   8.894763   3.620234  38.990317 
+.     D[2,2]     D[3,3] SIGMA[1,1] 
+.  32.096512  31.668012  10.775738
+```
+
+---
+
+# Sampling windows
+
+.pull-left[
+
+```r
+plot_efficiency_of_windows(
+  poped_db_mrg,
+  xt_plus  = c(rep(1/24, 2), rep(3/24, 5)),
+  xt_minus = c(rep(1/24, 2), rep(3/24, 5))
+)
+```
+]
+
+.pull-right[
+&lt;img src="slides_files/figure-html/unnamed-chunk-42-1.png" width="100%" /&gt;
+]
+
+???
+
+We'll allow:
+
+* 1 hour before or after samples on Day 1
+* 3 hours before or after other sampling times
+
+Again, the 100 sets of simulated samples show no significant deviations from the RSEs for the original samples, so we're golden.
+
+
+---
+
+# SSE results
+
+.pull-left[
+&lt;img src="slides_files/figure-html/unnamed-chunk-43-1.png" width="100%" /&gt;
+]
+
+.pull-right[
+.font-90[
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; param &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; poped_pct_rse &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; sim_pct_rse &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; sim_pct_bias &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; THETA1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10.9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 13.9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 13.6 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; THETA2 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10.7 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 17.1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1.8 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; THETA3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7.9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 38.4 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 15.5 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; THETA4 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6.4 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10.4 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6.6 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; THETA5 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 8.9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 16.9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -5.8 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; THETA6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.6 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -4.4 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; OMEGA(1,1) &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 39.0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 38.9 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -11.9 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; OMEGA(2,2) &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 32.1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 51.1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 24.6 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; OMEGA(4,4) &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 31.7 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 52.3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -12.6 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; SIGMA(1,1) &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 10.8 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 12.3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -7.0 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+]]
+
+---
+
+class: inverse, center, middle
+
+# Example: ODE PK/PD model
+
+---
+
+# Study design &amp; model
+
+.pull-left[
+
+* QD SC doses of **filgrastim**: 1, 3, and 10 &amp;mu;g/kg.
+
+* 10 subjects per dose group will be on active drug.
+
+* Dense PK and ANC samples on days 1 and 7.
+]
+
+.pull-right[
+
+![](pics/gcsf_paper.png)&lt;!-- --&gt;
+
+* PK/PD model from DDMORE .font-80[http://repository.ddmore.eu/model/DDMODEL00000077.6]
+
+* NONMEM model translated to `mrgsolve`
+.font-80[https://github.com/mrgsolve/depot/blob/master/vignette/gcsf.md]
+]
+
+.footnote[Krzyzanski, Wiczling, Lowe, et al. (2010)]
+
+---
+
+# Filgrastim ANC model
+
+.center[
+&lt;img src="pics/gcsf_model.png" width="85%" /&gt;
+]
+
+.footnote[Krzyzanski, Wiczling, Lowe, et al. (2010)]
+
+---
+
+# PK and ANC simulations
+
+.center[
+&lt;img src="slides_files/figure-html/unnamed-chunk-47-1.png" width="80%" /&gt;
+]
+
+---
+
+# Evaluate FIM for initial design
+
+
+
+
+```r
+FIM_gcsf &lt;- evaluate.fim(poped_db_gcsf)
+get_rse(FIM_gcsf, poped_db_gcsf)
+```
+
+
+```
+.    bpop[2]    bpop[5]    bpop[6]    bpop[7]    bpop[8]    bpop[9]   bpop[11] 
+.   3.289140  13.518742  12.604107   8.265412   3.822461  19.528269   4.066511 
+.   bpop[13]   bpop[14]   bpop[15]   bpop[16]   bpop[17]     D[1,1]     D[2,2] 
+.  17.017908  10.771361  20.851250   8.289988   7.664966  26.961113  32.644613 
+.     D[3,3]     D[5,5]     D[6,6]     D[7,7] SIGMA[1,1] SIGMA[3,3] SIGMA[4,4] 
+.  31.369081  41.941250  29.156946  26.406506   3.900224   6.541108   7.713365
+```
+
+---
+
+class: poll-slide
+
+# Poll Question #3
+
+## Any better doses for estimating SC50 or Smax?
+
+
+
+.pull-left[
+&lt;img src="slides_files/figure-html/unnamed-chunk-52-1.png" width="100%" /&gt;
+]
+
+.pull-right[
+1. 1, 3, 10 &amp;mu;g/kg
+{{content}}
+]
+
+--
+
+2. 0.3, 1, 3 &amp;mu;g/kg
+{{content}}
+
+--
+
+3. 0.3, 1, 10 &amp;mu;g/kg
+{{content}}
+
+--
+
+4. 0.1, 1, 3 &amp;mu;g/kg
+{{content}}
+
+--
+
+5. Are you still talking? I think you're on mute.
+{{content}}
+
+
+---
+
+class: poll-slide
+
+# Poll Question #3
+
+## Any better doses for estimating `\(SC_{50}\)` or `\(S_\textrm{max}\)`?
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;color: black !important;background-color: white !important;"&gt; Parameter &lt;/th&gt;
+   &lt;th style="text-align:left;color: black !important;background-color: white !important;"&gt; Design 1 &lt;/th&gt;
+   &lt;th style="text-align:left;color: black !important;background-color: white !important;"&gt; Design 2 &lt;/th&gt;
+   &lt;th style="text-align:left;color: black !important;background-color: white !important;"&gt; Design 3 &lt;/th&gt;
+   &lt;th style="text-align:left;color: black !important;background-color: white !important;"&gt; Design 4 &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; bpop[15] &lt;/td&gt;
+   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 20.9 &lt;/td&gt;
+   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 24.8 &lt;/td&gt;
+   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 21.8 &lt;/td&gt;
+   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 26.4 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; bpop[16] &lt;/td&gt;
+   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 8.3 &lt;/td&gt;
+   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 13.6 &lt;/td&gt;
+   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 9.5 &lt;/td&gt;
+   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 13.9 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; bpop[17] &lt;/td&gt;
+   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 7.7 &lt;/td&gt;
+   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 13.1 &lt;/td&gt;
+   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 8.7 &lt;/td&gt;
+   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 13.4 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+---
+
+class: inverse, center, middle
+
+# Wrap up
+
+---
+
+background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/1293/645438825_1039d343a0_k_d.jpg)
+background-size: cover
+
+# What did we learn today?
+
+.pull-left[
+* Optimal design can be a useful, if imperfect, tool to explore and optimize study design options
+{{content}}
+]
+
+--
+
+* Always run confirmatory simulations
+{{content}}
+
+--
+
+* Optimal design: it's not just for PK sampling any more!
+{{content}}
+
+???
+
+Image credit: [Flickr](https://www.flickr.com/photos/flex/645438825/)
+
+---
+
+background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/5614/15348032367_c571131bb9_k_d.jpg)
+background-size: cover
+  
+# What did we miss?
+
+.pull-left[
+* Dealing with parameter uncertainty (e.g., `\(ED\)`-, `\(HC\textrm{ln}D\)`-optimality)
+{{content}}
+]
+
+--
+
+* Dealing with model uncertainty (e.g. `\(T\)`-optimality)
+{{content}}
+
+--
+
+* Ignoring unimportant parameters (e.g. `\(D_S\)`-, `\(G\)`-optimality)
+{{content}}
+
+--
+
+* Basically an alphabet of other criteria: `\(A\)`-, `\(C\)`-, `\(G\)`-, `\(V\)`-optimality, etc.
+{{content}}
+
+--
+
+* Almost all of `PopED`'s options
+{{content}}
+
+???
+
+Image credit: [Flickr](https://www.flickr.com/photos/traveloriented/15348032367/)
+
+---
+
+background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/6077/6039404304_db836ce6d8_k_d.jpg)
+background-size: cover
+  
+# Software resources
+
+.pull-left[
+* `PopED`: https://andrewhooker.github.io/PopED/
+
+* `mrgsolve`: https://mrgsolve.github.io/
+
+* `babylon`: https://github.com/metrumresearchgroup/babylon
+  + `rbabylon`: https://metrumresearchgroup.github.io/rbabylon/
+]
+
+???
+
+Image credit: [Flickr](https://www.flickr.com/photos/dmuth/6039404304)
+
+---
+
+# References
+
+Foracchia, M, A. Hooker, P. Vicini, et al. (2004). "POPED, a software
+for optimal experiment design in population kinetics". In: _Comput.
+Methods Programs Biomed._ 74.1, pp. 29-46.
+
+Krzyzanski, W, P. Wiczling, P. Lowe, et al. (2010). "Population
+modeling of filgrastim PK-PD in healthy adults following intravenous
+and subcutaneous administrations". In: _J. Clin. Pharmacol._ 50.9
+Suppl, pp. 101S-112S.
+
+Mentre, F, A. Mallet, and D. Baccar (1997). "Optimal design in
+random-effects regression models". In: _Biometrika_ 84.2, pp.
+429-442.
+
+Nyberg, J, C. Bazzoli, K. Ogungbenro, et al. (2014). "Methods and
+software tools for design evaluation for population
+pharmacokinetics-pharmacodynamics studies". In: _Br. J. Clin.
+Pharmacol._.
+
+Nyberg, J, S. Ueckert, E. A. Strömberg, et al. (2012). "PopED: an
+extended, parallelized, nonlinear mixed effects models optimal design
+tool". In: _Comput. Methods Programs Biomed._ 108.2, pp. 789-805.
+
+Retout, S, S. Duffull, and F. Mentre (2001). "Development and
+implementation of the population Fisher information matrix for the
+evaluation of population pharmacokinetic designs". In: _Comput.
+Methods Programs Biomed._ 65.2, pp. 141-151.
+
+Retout, S. and F. Mentre (2003). "Further developments of the Fisher
+information matrix in nonlinear mixed effects models with evaluation
+in population pharmacokinetics". In: _J. Biopharm. Stat._ 13.2, pp.
+209-227.
+
+---
+
+class: center, middle
+
+# Thank you
+
+---
+
+class: inverse, center, middle
+
+# Backup slides
+
+---
+
+class: inverse, center, middle
+
+# Simulation
+
+---
+
+# SSE: `template.csv`
+
+```
+$PROB RUN# run_num
+$INPUT ID TIME EVID MDV CMT AMT SS II DV WT
+$DATA data_fname IGNORE=@
+...
+$SIMULATION (run_num)
+$ESTIMATION METHOD=1 INTER PRINT=1 MSFO=./run_num.msf
+```
+
+---
+
+# SSE: Run the models with `rbabylon`
+
+
+```r
+run_model &lt;- function(.design_dir, .run_num) {
+  # Modify and write the control stream
+  ctl_template %&gt;% 
+    str_replace("run_num", as.character(.run_num)) %&gt;% 
+    str_replace("data_fname", paste0("../", .run_num, ".csv")) %&gt;% 
+    writeLines(file.path(.design_dir, paste0(.run_num, ".ctl")))
+  
+  # Run the model
+* new_model(
+*   .yaml_path = paste0(.run_num, ".yaml"),
+*   .description = .run_num,
+*   .directory = design_dir
+* ) %&gt;%
+*   submit_model()
+}
+```
+
+---
+
+# SSE: Collect the results with `rbabylon`
+
+
+```r
+get_est &lt;- function(.design_dir) {
+  est &lt;- map_dfr(seq_len(n_rep), function(.run_num) {
+*   mod &lt;- read_model(paste0(.run_num, ".yaml"), .directory = .design_dir)
+*   mod_sum &lt;- try(model_summary(mod), silent = TRUE)
+    if (inherits(mod_sum, "try-error")) return(NULL)
+*   mod_sum %&gt;%
+*     param_estimates() %&gt;%
+      filter(fixed == 0) %&gt;% 
+      select(param = names, estimate) %&gt;% 
+      mutate(rep = .run_num)
+  }) %&gt;% 
+    left_join(true_vals) %&gt;% 
+    mutate(
+      param = factor(param, levels = unique(.[["param"]])),
+      pct_bias = (estimate - value) / abs(value) * 100
+    ) %&gt;% 
+    filter(abs(pct_bias) &lt; 5000)
+  return(est)
+}
+```
+
+---
+
+class: inverse, center, middle
+
+# PopED setup
 
 ---
 
@@ -994,1097 +2097,6 @@ poped_db &lt;- create.poped.database(
 ???
 
 The "covariates" in our model.  Note that we're using a single body weight here to keep things simple, but we could [use a distribution if necessary](https://cran.r-project.org/web/packages/PopED/vignettes/examples.html#distribution-of-covariates).
-
----
-
-# Plot of initial design
-
-.pull-left[
-
-```r
-plot_model_prediction(
-  poped_db,
-  model.names = c("Day 1", "Steady state"),
-  facet_scales = "free_x",
-  model_num_points = 200
-) +
-  labs(x = "Time from dose (h)") +
-  theme_bw()
-```
-]
-
-.pull-right[
-![](slides_files/figure-html/test-plot-1-1.png)
-]
-
-???
-
-`PopED` includes a function to generate a quick test plot showing the typical response(s), along with the initial sampling times.
-
----
-
-# Evaluate FIM
-
-
-```r
-FIM &lt;- evaluate.fim(poped_db) 
-det(FIM)
-```
-
-```
-. [1] 0.04804071
-```
-
-
-```r
-get_rse(FIM, poped_db)
-```
-
-```
-.      bpop[1]      bpop[2]      bpop[3]       D[1,1]       D[2,2]       D[3,3] 
-. 2.983306e+05 3.132072e+06 4.936333e+06 5.192188e+01 4.888612e+02 6.485818e+02 
-.   SIGMA[1,1]   SIGMA[2,2] 
-. 2.997297e+01 4.082483e+01
-```
-
-
-```r
-poped_db2 &lt;- create.poped.database( poped_db, xt = c(5, c(23, 24, 24, 168)) )
-FIM2 &lt;- evaluate.fim(poped_db2) 
-get_rse(FIM2, poped_db2)
-```
-
-```
-.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-.   15.48778  142.08530  223.35925   50.88485  418.53695  549.75962   29.68444 
-. SIGMA[2,2] 
-.   40.82396
-```
-
-???
-
-This determinant is what will be used to optimize the design, but it's not particularly helpful by itself.  What we really need are the predicted standard errors based on the FIM.
-
-The RSEs are crazy high, which suggests that the model is not identifiable.  A slight tweak to a single timepoint (increasing the number of support points) may help.
-
-The RSEs are no longer in the millions, but certainly not as low as we'd hope for. Let's see if we can make any improvements with optimization.
-
----
-
-# *D*-optimal design: Starting from the original design
-
-.pull-left-40[
-
-```r
-output &lt;- poped_optim(
-  poped_db,
-  opt_xt = TRUE,
-  parallel = TRUE,
-  parallel_type = "multicore",
-  seed = 1
-)
-summary(output)
-```
-]
-
-.pull-right-60[
-.font-90[
-
-```
-. ===============================================================================
-. FINAL RESULTS
-. Optimized Sampling Schedule
-. Group 1: Model 1: 0.3276
-. Group 1: Model 2:     23     24     24     96
-. 
-. OFV = 20.2291
-. 
-. Efficiency: 
-.   ((exp(ofv_final) / exp(ofv_init))^(1/n_parameters)) = 18.322
-. 
-. Expected relative standard error
-. (%RSE, rounded to nearest integer):
-.     Parameter   Values     RSE_0   RSE
-.       bpop[1]       10    298333    38
-.       bpop[2]      100   3132099   149
-.       bpop[3]     0.25   4936376   153
-.        D[1,1]     0.08        52    50
-.        D[2,2]      0.1       489   204
-.        D[3,3]      0.2       649   127
-.    SIGMA[1,1]     0.05        30    30
-.    SIGMA[2,2]        1        41    41
-. 
-. Total running time: 9.327 seconds
-```
-]
-]
-
-
-???
-
-Better, but still not good enough.
-
----
-
-# Add another post dose sample at SS
-
-
-```r
-poped_db_extra_ss &lt;- create.poped.database(
-  ff_fun = ff,
-  fg_fun = fg,
-  fError_fun = feps.add.prop,
-  bpop = c(CL = 10, V = 100, KA = 0.25, WT_CL = 0.75, WT_V = 1), 
-  notfixed_bpop = c(1, 1, 1, 0, 0),
-  d = c(CL = 0.08, V = 0.1, KA = 0.2), 
-  sigma = c(0.05, 1),
-  m = 1,
-  groupsize = 12,
-* xt = c(5, c(rep(24, 3), 4, 168)),
-* minxt = c(0, c(rep(23, 3), 0, 96)),
-* maxxt = c(6, c(rep(24, 3), 6, 168)),
-* model_switch = c(1, rep(2, 5)),
-  a = cbind(DOSE = 10, TAU = 24, WT = 32)
-)
-```
-
-???
-
-Add another post dose sample at steady state.
-
-We'll create the PopED database from scratch again.  This is probably easier than updating an old database when you change the number of samples because certain vectors (like `grouped_xt`) are generated automatically if you don't supply the argument and we don't want to fuss with that.
-
----
-
-# Add another post dose sample at SS
-
-
-```r
-FIM_extra_ss &lt;- evaluate.fim(poped_db_extra_ss) 
-get_rse(FIM_extra_ss, poped_db_extra_ss)
-```
-
-```
-.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-.   13.38487   80.99149  119.36373   46.82132  253.41994  288.82097   24.18497 
-. SIGMA[2,2] 
-.   40.80823
-```
-
----
-
-# *D*-optimal design: Add another post dose sample at SS
-
-.pull-left-40[
-
-```r
-output_extra_ss &lt;- poped_optim(
-  poped_db_extra_ss,
-  opt_xt = TRUE,
-  parallel = TRUE,
-  parallel_type = "multicore",
-  seed = 1
-)
-summary(output_extra_ss)
-```
-]
-
-.pull-right-60[
-.font-90[
-
-```
-. ===============================================================================
-. FINAL RESULTS
-. Optimized Sampling Schedule
-. Group 1: Model 1:      6
-. Group 1: Model 2: 0.9979     23     23     24     96
-. 
-. OFV = 24.6494
-. 
-. Efficiency: 
-.   ((exp(ofv_final) / exp(ofv_init))^(1/n_parameters)) = 1.6623
-. 
-. Expected relative standard error
-. (%RSE, rounded to nearest integer):
-.     Parameter   Values   RSE_0   RSE
-.       bpop[1]       10      13     9
-.       bpop[2]      100      81    26
-.       bpop[3]     0.25     119    35
-.        D[1,1]     0.08      47    47
-.        D[2,2]      0.1     253   124
-.        D[3,3]      0.2     289   120
-.    SIGMA[1,1]     0.05      24    25
-.    SIGMA[2,2]        1      41    41
-. 
-. Total running time: 12.69 seconds
-```
-]]
-
----
-
-# Add sample after the final (SS) dose
-
-
-```r
-poped_db_final &lt;- create.poped.database(
-  poped_db_extra_ss,
-  xt = c(5, c(rep(24, 3), 72, 168)),
-  minxt = c(0, c(rep(23, 3), 0, 168)),
-  maxxt = c(6, c(rep(24, 3), 168, 168))
-)
-```
-
-
-```r
-FIM_final &lt;- evaluate.fim(poped_db_final) 
-get_rse(FIM_final, poped_db_final)
-```
-
-```
-.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-.   12.31062   86.75053  136.64068   50.42738  317.03881  419.93344   29.55819 
-. SIGMA[2,2] 
-.   28.95827
-```
-
-???
-
-Add another sample after the final dose.
-
-This time we can just update the previous PopED database.
-
----
-
-# *D*-optimal design: Add sample after the final (SS) dose
-
-.pull-left-40[
-
-```r
-output_final &lt;- poped_optim(
-  poped_db_final,
-  opt_xt = TRUE,
-  parallel = TRUE,
-  parallel_type = "multicore",
-  seed = 1
-)
-summary(output_final)
-```
-]
-
-.pull-right-60[
-.font-90[
-
-```
-. ===============================================================================
-. FINAL RESULTS
-. Optimized Sampling Schedule
-. Group 1: Model 1: 0.4454
-. Group 1: Model 2:     23     23     23  41.09    168
-. 
-. OFV = 27.717
-. 
-. Efficiency: 
-.   ((exp(ofv_final) / exp(ofv_init))^(1/n_parameters)) = 2.7831
-. 
-. Expected relative standard error
-. (%RSE, rounded to nearest integer):
-.     Parameter   Values   RSE_0   RSE
-.       bpop[1]       10      12     9
-.       bpop[2]      100      87    14
-.       bpop[3]     0.25     137    17
-.        D[1,1]     0.08      50    48
-.        D[2,2]      0.1     317    74
-.        D[3,3]      0.2     420    63
-.    SIGMA[1,1]     0.05      30    29
-.    SIGMA[2,2]        1      29    39
-. 
-. Total running time: 11.964 seconds
-```
-]]
-
----
-
-# Near-optimal design
-
-
-```r
-poped_db_practical &lt;- create.poped.database(
-  poped_db_final,
-  xt = c(0.5, rep(24, 3), 32, 168)
-)
-FIM_practical &lt;- evaluate.fim(poped_db_practical) 
-get_rse(FIM_practical, poped_db_practical)
-```
-
-```
-.    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-.   10.15307   19.61044   22.79548   48.67831   97.63716   74.56113   26.52843 
-. SIGMA[2,2] 
-.   40.69749
-```
-
-???
-
-This optimal design serves us well, but it's not very practical to request a sample at 41.09 hours after the final dose.  For a dose at 8 AM, that would mean a sample at around 1 AM.  Instead we'll construct a similar design with more practical times and see how that affects our RSEs.  We can do this by building a new `PopED` database based on the previous one.
-
-This second-to-last sample at 32 hours would be at 4 PM the day after an 8 AM final dose.  More practical, and we don't seem to lose too much in terms of RSE.
-
----
-
-.pull-left[
-
-```r
-plot_model_prediction(
-  poped_db_practical,
-  model.names = c("Day 1", "Steady state"),
-  facet_scales = "free_x",
-  model_num_points = 200
-) +
-  labs(x = "Time from dose (h)") +
-  theme_bw()
-```
-]
-
-.pull-right[
-![](slides_files/figure-html/test-plot-2-1.png)
-]
-
----
-
-# Sampling windows
-
-.pull-left[
-
-```r
-plot_efficiency_of_windows(
-  poped_db_practical,
-  xt_plus  = c(0.25, rep(0, 3), 2, 0),
-  xt_minus = c(0.25, rep(1, 3), 2, 4)
-)
-```
-]
-
-.pull-right[
-![](slides_files/figure-html/test-plot-3-1.png)
-]
-
-???
-
-Next, we'll construct windows around our sampling times to provide some flexibility in sampling.  We evaluate the effect of this flexibility on the RSEs.
-
-We'll allow:
-
-* up to 15 minutes before or after the first sample at half an hour (i.e., 15-45 minutes post dose)
-* up to 1 hour before each trough sample (i.e., 0-1 hours pre dose)
-* up to 2 hours before or after the 32-hour sample after the final dose (i.e., 30-34 hours after the final dose)
-* up to 4 hours before the final sample (i.e., 164-168 hours post final dose)
-
-The 100 sets of simulated samples show no significant deviations from the RSEs for the optimal samples.
-
----
-
-# SSE Results
-
-.pull-left[
-&lt;img src="slides_files/figure-html/unnamed-chunk-38-1.png" width="100%" /&gt;
-]
-
-.pull-right[
-.font-90[
-&lt;table&gt;
- &lt;thead&gt;
-  &lt;tr&gt;
-   &lt;th style="text-align:left;"&gt; param &lt;/th&gt;
-   &lt;th style="text-align:right;"&gt; poped_pct_rse &lt;/th&gt;
-   &lt;th style="text-align:right;"&gt; sim_pct_rse &lt;/th&gt;
-   &lt;th style="text-align:right;"&gt; sim_pct_bias &lt;/th&gt;
-  &lt;/tr&gt;
- &lt;/thead&gt;
-&lt;tbody&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; THETA1 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 10.2 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 12.2 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 4.2 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; THETA2 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 19.6 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 29.0 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 6.7 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; THETA3 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 22.8 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 32.0 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 0.4 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; OMEGA(1,1) &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 48.7 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 74.2 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 41.7 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; OMEGA(2,2) &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 97.6 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 132.8 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 25.9 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; OMEGA(3,3) &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 74.6 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 90.0 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 7.2 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; SIGMA(1,1) &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 26.5 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 28.6 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; -6.7 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; SIGMA(2,2) &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 40.7 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 41.3 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 11.9 &lt;/td&gt;
-  &lt;/tr&gt;
-&lt;/tbody&gt;
-&lt;/table&gt;
-]]
-
----
-
-class: inverse, center, middle
-
-# Example: ODE PK model
-
----
-
-# Study design and model
-
-.pull-left[
-**Fakinumab** is being studied in humans for the first time.
-
-* Single IV bolus doses of fakinumab: 0.03, 0.1, 0.3, 1, 3, and 10 mg.
-* 6 subjects per dose group will be on active drug.
-* Proposed samples: 1 and 4 hours post dose, and 1, 3, 7, 14, 21 days post dose.
-]
-
-.pull-right[
-Based on projections from animal PK data, we predict that a 2-compartment model with linear and nonlinear (Michaelis-Menten) clearance from the central compartment will desribe the data.
-
-&lt;table&gt;
- &lt;thead&gt;
-  &lt;tr&gt;
-   &lt;th style="text-align:right;"&gt; CL &lt;/th&gt;
-   &lt;th style="text-align:right;"&gt; VMAX &lt;/th&gt;
-   &lt;th style="text-align:right;"&gt; KM &lt;/th&gt;
-   &lt;th style="text-align:right;"&gt; V1 &lt;/th&gt;
-   &lt;th style="text-align:right;"&gt; Q &lt;/th&gt;
-   &lt;th style="text-align:right;"&gt; V2 &lt;/th&gt;
-  &lt;/tr&gt;
- &lt;/thead&gt;
-&lt;tbody&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:right;"&gt; 0.5 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 20 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 1.2 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 2.5 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 10 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 4 &lt;/td&gt;
-  &lt;/tr&gt;
-&lt;/tbody&gt;
-&lt;/table&gt;
-
-We include log-normal IIV on `CL`, `VMAX`, and `V1`, and a proportional residual error.
-
-&lt;table&gt;
- &lt;thead&gt;
-  &lt;tr&gt;
-   &lt;th style="text-align:right;"&gt; om_CL &lt;/th&gt;
-   &lt;th style="text-align:right;"&gt; om_VMAX &lt;/th&gt;
-   &lt;th style="text-align:right;"&gt; om_V1 &lt;/th&gt;
-   &lt;th style="text-align:right;"&gt; sigma_prop &lt;/th&gt;
-  &lt;/tr&gt;
- &lt;/thead&gt;
-&lt;tbody&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:right;"&gt; 0.2 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 0.2 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 0.1 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 0.15 &lt;/td&gt;
-  &lt;/tr&gt;
-&lt;/tbody&gt;
-&lt;/table&gt;
-]
-
----
-
-# Model in `mrgsolve`
-
-
-```
-. 
-. Model file:  model_poped.cpp 
-. [ param ]
-. CL = 1, VMAX = 10, KM = 10, V1 = 8, Q = 10, V2 = 100
-. 
-. [ cmt ] CENT PERIPH
-. 
-. [ main ]
-. double ke  = CL/V1;
-. double k12 = Q/V1;
-. double k21 = Q/V2;
-. 
-. [ ode ]
-. double CP = CENT/V1;
-. 
-. dxdt_CENT = k21*PERIPH - k12*CENT - VMAX*CP/(KM + CP) - ke*CENT;
-. dxdt_PERIPH = k12*CENT - k21*PERIPH;
-. 
-. [ capture ]
-. CP
-```
-
----
-
-# `ff()` for `mrgsolve` model
-
-.pull-left[
-.font-80[
-
-```r
-ff &lt;- function(model_switch, xt, parameters, poped.db) {
-  obs_time &lt;- as.numeric(xt)
-  dose_time &lt;- 0
-  
-  dose &lt;- data.frame(
-    ID = 1, 
-    amt = parameters[["DOSE"]]*1000,
-    cmt = 1, 
-    evid = 1,
-    time = dose_time
-  )
-  obs &lt;- data.frame(
-    ID = 1, 
-    amt = 0, 
-    cmt = 1, 
-    evid = 0, 
-    time = sort(obs_time)
-  )
-```
-]]
-
-.pull-right[
-.font-80[
-
-```r
-  data &lt;- arrange(bind_rows(dose,obs),time)
-
-  mod &lt;- param(mod, parameters)
-  
-  out &lt;- mrgsim_q(mod,data,output="matrix")
-  
-  out &lt;- out[data$evid==0,"CP",drop=FALSE][match(obs_time,obs$time),]
-  
-  return(list(y = out, poped.db = poped.db))
-}
-```
-]]
-
----
-
-# Plot of initial design
-
-
-
-.center[
-&lt;img src="slides_files/figure-html/unnamed-chunk-46-1.png" width="80%" /&gt;
-]
-
----
-
-# Evaluate FIM
-
-
-```r
-FIM_mrg &lt;- evaluate.fim(poped_db_mrg) 
-get_rse(FIM_mrg, poped_db_mrg)
-```
-
-```
-.    bpop[1]    bpop[2]    bpop[3]    bpop[4]    bpop[5]    bpop[6]     D[1,1] 
-.  10.874541  10.660202   7.935122   6.355306   8.894763   3.620234  38.990317 
-.     D[2,2]     D[3,3] SIGMA[1,1] 
-.  32.096512  31.668012  10.775738
-```
-
----
-
-# Sampling windows
-
-.pull-left[
-
-```r
-plot_efficiency_of_windows(
-  poped_db_mrg,
-  xt_plus  = c(rep(1/24, 2), rep(3/24, 5)),
-  xt_minus = c(rep(1/24, 2), rep(3/24, 5))
-)
-```
-]
-
-.pull-right[
-&lt;img src="slides_files/figure-html/unnamed-chunk-49-1.png" width="100%" /&gt;
-]
-
-???
-
-We'll allow:
-
-* 1 hour before or after samples on Day 1
-* 3 hours before or after other sampling times
-
-Again, the 100 sets of simulated samples show no significant deviations from the RSEs for the original samples, so we're golden.
-
-
----
-
-# SSE results
-
-.pull-left[
-&lt;img src="slides_files/figure-html/unnamed-chunk-50-1.png" width="100%" /&gt;
-]
-
-.pull-right[
-.font-90[
-&lt;table&gt;
- &lt;thead&gt;
-  &lt;tr&gt;
-   &lt;th style="text-align:left;"&gt; param &lt;/th&gt;
-   &lt;th style="text-align:right;"&gt; poped_pct_rse &lt;/th&gt;
-   &lt;th style="text-align:right;"&gt; sim_pct_rse &lt;/th&gt;
-   &lt;th style="text-align:right;"&gt; sim_pct_bias &lt;/th&gt;
-  &lt;/tr&gt;
- &lt;/thead&gt;
-&lt;tbody&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; THETA1 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 10.9 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 13.9 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 13.6 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; THETA2 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 10.7 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 17.1 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 1.8 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; THETA3 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 7.9 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 38.4 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 15.5 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; THETA4 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 6.4 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 10.4 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 6.6 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; THETA5 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 8.9 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 16.9 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; -5.8 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; THETA6 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 3.6 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 9.6 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; -4.4 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; OMEGA(1,1) &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 39.0 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 38.9 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; -11.9 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; OMEGA(2,2) &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 32.1 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 51.1 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 24.6 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; OMEGA(4,4) &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 31.7 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 52.3 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; -12.6 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;"&gt; SIGMA(1,1) &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 10.8 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 12.3 &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; -7.0 &lt;/td&gt;
-  &lt;/tr&gt;
-&lt;/tbody&gt;
-&lt;/table&gt;
-]]
-
----
-
-class: inverse, center, middle
-
-# Example: ODE PK/PD model
-
----
-
-# Study design &amp; model
-
-.pull-left[
-
-* QD SC doses of **filgrastim**: 1, 3, and 10 &amp;mu;g/kg.
-
-* 10 subjects per dose group will be on active drug.
-
-* Dense PK and ANC samples on days 1 and 7.
-]
-
-.pull-right[
-
-![](pics/gcsf_paper.png)&lt;!-- --&gt;
-
-* PK/PD model from DDMORE .font-80[http://repository.ddmore.eu/model/DDMODEL00000077.6]
-
-* NONMEM model translated to `mrgsolve`
-.font-80[https://github.com/mrgsolve/depot/blob/master/vignette/gcsf.md]
-]
-
-.footnote[Krzyzanski, Wiczling, Lowe, et al. (2010)]
-
----
-
-# Filgrastim ANC model
-
-.center[
-&lt;img src="pics/gcsf_model.png" width="85%" /&gt;
-]
-
-.footnote[Krzyzanski, Wiczling, Lowe, et al. (2010)]
-
----
-
-# PK and ANC simulations
-
-.center[
-&lt;img src="slides_files/figure-html/unnamed-chunk-54-1.png" width="80%" /&gt;
-]
-
----
-
-# Evaluate FIM for initial design
-
-
-
-
-```r
-FIM_gcsf &lt;- evaluate.fim(poped_db_gcsf)
-get_rse(FIM_gcsf, poped_db_gcsf)
-```
-
-
-```
-.    bpop[2]    bpop[5]    bpop[6]    bpop[7]    bpop[8]    bpop[9]   bpop[11] 
-.   3.289140  13.518742  12.604107   8.265412   3.822461  19.528269   4.066511 
-.   bpop[13]   bpop[14]   bpop[15]   bpop[16]   bpop[17]     D[1,1]     D[2,2] 
-.  17.017908  10.771361  20.851250   8.289988   7.664966  26.961113  32.644613 
-.     D[3,3]     D[5,5]     D[6,6]     D[7,7] SIGMA[1,1] SIGMA[3,3] SIGMA[4,4] 
-.  31.369081  41.941250  29.156946  26.406506   3.900224   6.541108   7.713365
-```
-
----
-
-class: poll-slide
-
-# Poll Question #3
-
-## Any better doses for estimating SC50 or Smax?
-
-
-
-.pull-left[
-&lt;img src="slides_files/figure-html/unnamed-chunk-59-1.png" width="100%" /&gt;
-]
-
-.pull-right[
-1. 1, 3, 10 &amp;mu;g/kg
-{{content}}
-]
-
---
-
-2. 0.3, 1, 3 &amp;mu;g/kg
-{{content}}
-
---
-
-3. 0.3, 1, 10 &amp;mu;g/kg
-{{content}}
-
---
-
-4. 0.1, 1, 3 &amp;mu;g/kg
-{{content}}
-
---
-
-5. Are you still talking? I think you're on mute.
-{{content}}
-
-
----
-
-class: poll-slide
-
-# Poll Question #3
-
-## Any better doses for estimating `\(SC_{50}\)` or `\(S_\textrm{max}\)`?
-
-&lt;table&gt;
- &lt;thead&gt;
-  &lt;tr&gt;
-   &lt;th style="text-align:left;color: black !important;background-color: white !important;"&gt; Parameter &lt;/th&gt;
-   &lt;th style="text-align:left;color: black !important;background-color: white !important;"&gt; Design 1 &lt;/th&gt;
-   &lt;th style="text-align:left;color: black !important;background-color: white !important;"&gt; Design 2 &lt;/th&gt;
-   &lt;th style="text-align:left;color: black !important;background-color: white !important;"&gt; Design 3 &lt;/th&gt;
-   &lt;th style="text-align:left;color: black !important;background-color: white !important;"&gt; Design 4 &lt;/th&gt;
-  &lt;/tr&gt;
- &lt;/thead&gt;
-&lt;tbody&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; bpop[15] &lt;/td&gt;
-   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 20.9 &lt;/td&gt;
-   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 24.8 &lt;/td&gt;
-   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 21.8 &lt;/td&gt;
-   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 26.4 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; bpop[16] &lt;/td&gt;
-   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 8.3 &lt;/td&gt;
-   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 13.6 &lt;/td&gt;
-   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 9.5 &lt;/td&gt;
-   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 13.9 &lt;/td&gt;
-  &lt;/tr&gt;
-  &lt;tr&gt;
-   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; bpop[17] &lt;/td&gt;
-   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 7.7 &lt;/td&gt;
-   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 13.1 &lt;/td&gt;
-   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 8.7 &lt;/td&gt;
-   &lt;td style="text-align:left;color: black !important;background-color: white !important;"&gt; 13.4 &lt;/td&gt;
-  &lt;/tr&gt;
-&lt;/tbody&gt;
-&lt;/table&gt;
-
----
-
-class: inverse, center, middle
-
-# Wrap up
-
----
-
-background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/1293/645438825_1039d343a0_k_d.jpg)
-background-size: cover
-
-# What did we learn today?
-
-.pull-left[
-* Optimal design can be a useful, if imperfect, tool to explore and optimize study design options
-{{content}}
-]
-
---
-
-* Always run confirmatory simulations
-{{content}}
-
---
-
-* Optimal design: it's not just for PK sampling any more!
-{{content}}
-
-???
-
-Image credit: [Flickr](https://www.flickr.com/photos/flex/645438825/)
-
----
-
-background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/5614/15348032367_c571131bb9_k_d.jpg)
-background-size: cover
-  
-# What did we miss?
-
-.pull-left[
-* Dealing with parameter uncertainty (e.g., `\(ED\)`-, `\(HC\textrm{ln}D\)`-optimality)
-{{content}}
-]
-
---
-
-* Dealing with model uncertainty (e.g. `\(T\)`-optimality)
-{{content}}
-
---
-
-* Ignoring unimportant parameters (e.g. `\(D_S\)`-, `\(G\)`-optimality)
-{{content}}
-
---
-
-* Basically an alphabet of other criteria: `\(A\)`-, `\(C\)`-, `\(G\)`-, `\(V\)`-optimality, etc.
-{{content}}
-
---
-
-* Almost all of `PopED`'s options
-{{content}}
-
-???
-
-Image credit: [Flickr](https://www.flickr.com/photos/traveloriented/15348032367/)
-
----
-
-background-image: linear-gradient(90deg, rgba(255,255,255,1) 50%, rgba(0,0,0,0) 70%), url(https://live.staticflickr.com/6077/6039404304_db836ce6d8_k_d.jpg)
-background-size: cover
-  
-# Software resources
-
-.pull-left[
-* `PopED`: https://andrewhooker.github.io/PopED/
-
-* `mrgsolve`: https://mrgsolve.github.io/
-
-* `babylon`: https://github.com/metrumresearchgroup/babylon
-  + `rbabylon`: https://metrumresearchgroup.github.io/rbabylon/
-]
-
-???
-
-Image credit: [Flickr](https://www.flickr.com/photos/dmuth/6039404304)
-
----
-
-# References
-
-Foracchia, M, A. Hooker, P. Vicini, et al. (2004). "POPED, a software
-for optimal experiment design in population kinetics". In: _Comput.
-Methods Programs Biomed._ 74.1, pp. 29-46.
-
-Krzyzanski, W, P. Wiczling, P. Lowe, et al. (2010). "Population
-modeling of filgrastim PK-PD in healthy adults following intravenous
-and subcutaneous administrations". In: _J. Clin. Pharmacol._ 50.9
-Suppl, pp. 101S-112S.
-
-Mentre, F, A. Mallet, and D. Baccar (1997). "Optimal design in
-random-effects regression models". In: _Biometrika_ 84.2, pp.
-429-442.
-
-Nyberg, J, C. Bazzoli, K. Ogungbenro, et al. (2014). "Methods and
-software tools for design evaluation for population
-pharmacokinetics-pharmacodynamics studies". In: _Br. J. Clin.
-Pharmacol._.
-
-Nyberg, J, S. Ueckert, E. A. Strömberg, et al. (2012). "PopED: an
-extended, parallelized, nonlinear mixed effects models optimal design
-tool". In: _Comput. Methods Programs Biomed._ 108.2, pp. 789-805.
-
-Retout, S, S. Duffull, and F. Mentre (2001). "Development and
-implementation of the population Fisher information matrix for the
-evaluation of population pharmacokinetic designs". In: _Comput.
-Methods Programs Biomed._ 65.2, pp. 141-151.
-
-Retout, S. and F. Mentre (2003). "Further developments of the Fisher
-information matrix in nonlinear mixed effects models with evaluation
-in population pharmacokinetics". In: _J. Biopharm. Stat._ 13.2, pp.
-209-227.
-
----
-
-class: center, middle
-
-# Thank you
-
----
-
-class: inverse, center, middle
-
-# Backup slides
-
----
-
-# SSE: `template.csv`
-
-```
-$PROB RUN# run_num
-$INPUT ID TIME EVID MDV CMT AMT SS II DV WT
-$DATA data_fname IGNORE=@
-...
-$SIMULATION (run_num)
-$ESTIMATION METHOD=1 INTER PRINT=1 MSFO=./run_num.msf
-```
-
----
-
-# SSE: Run the models with `rbabylon`
-
-
-```r
-run_model &lt;- function(.design_dir, .run_num) {
-  # Modify and write the control stream
-  ctl_template %&gt;% 
-    str_replace("run_num", as.character(.run_num)) %&gt;% 
-    str_replace("data_fname", paste0("../", .run_num, ".csv")) %&gt;% 
-    writeLines(file.path(.design_dir, paste0(.run_num, ".ctl")))
-  
-  # Run the model
-* new_model(
-*   .yaml_path = paste0(.run_num, ".yaml"),
-*   .description = .run_num,
-*   .directory = design_dir
-* ) %&gt;%
-*   submit_model()
-}
-```
-
----
-
-# SSE: Collect the results with `rbabylon`
-
-
-```r
-get_est &lt;- function(.design_dir) {
-  est &lt;- map_dfr(seq_len(n_rep), function(.run_num) {
-*   mod &lt;- read_model(paste0(.run_num, ".yaml"), .directory = .design_dir)
-*   mod_sum &lt;- try(model_summary(mod), silent = TRUE)
-    if (inherits(mod_sum, "try-error")) return(NULL)
-*   mod_sum %&gt;%
-*     param_estimates() %&gt;%
-      filter(fixed == 0) %&gt;% 
-      select(param = names, estimate) %&gt;% 
-      mutate(rep = .run_num)
-  }) %&gt;% 
-    left_join(true_vals) %&gt;% 
-    mutate(
-      param = factor(param, levels = unique(.[["param"]])),
-      pct_bias = (estimate - value) / abs(value) * 100
-    ) %&gt;% 
-    filter(abs(pct_bias) &lt; 5000)
-  return(est)
-}
-```
 
 ---
     </textarea>
