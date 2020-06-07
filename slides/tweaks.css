@@ -11,6 +11,11 @@
   display: none;
 }
 
+/* comment this out to keep slide numbers */
+.remark-slide-number {
+  display: none;
+}
+
 .my-footer {
   content: "";
   position: absolute;
