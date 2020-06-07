@@ -686,6 +686,8 @@ det(FIM)
 . [1] 0.04804071
 ```
 
+--
+
 
 ```r
 get_rse(FIM, poped_db)
@@ -697,6 +699,8 @@ get_rse(FIM, poped_db)
 .   SIGMA[1,1]   SIGMA[2,2] 
 . 2.997297e+01 4.082483e+01
 ```
+
+--
 
 
 ```r
@@ -744,6 +748,8 @@ output &lt;- poped_optim(
 summary(output)
 ```
 ]
+
+--
 
 .pull-right-60[
 .font-90[
@@ -798,6 +804,8 @@ poped_db_extra_ss &lt;- create.poped.database(
   ...
 )
 ```
+
+--
 
 
 ```r
@@ -881,6 +889,8 @@ poped_db_final &lt;- create.poped.database(
 )
 ```
 
+--
+
 
 ```r
 FIM_final &lt;- evaluate.fim(poped_db_final) 
@@ -959,6 +969,12 @@ poped_db_practical &lt;- create.poped.database(
   poped_db_final,
   xt = c(0.5, rep(24, 3), 32, 168)
 )
+```
+
+--
+
+
+```r
 FIM_practical &lt;- evaluate.fim(poped_db_practical) 
 get_rse(FIM_practical, poped_db_practical)
 ```
@@ -1033,7 +1049,7 @@ The 100 sets of simulated samples show no significant deviations from the RSEs f
 # SSE Results
 
 .pull-left[
-&lt;img src="slides_files/figure-html/unnamed-chunk-31-1.png" width="100%" /&gt;
+&lt;img src="slides_files/figure-html/unnamed-chunk-32-1.png" width="100%" /&gt;
 ]
 
 .pull-right[
@@ -1247,7 +1263,7 @@ ff &lt;- function(model_switch, xt, parameters, poped.db) {
 
 
 .center[
-&lt;img src="slides_files/figure-html/unnamed-chunk-39-1.png" width="80%" /&gt;
+&lt;img src="slides_files/figure-html/unnamed-chunk-40-1.png" width="80%" /&gt;
 ]
 
 ---
@@ -1283,7 +1299,7 @@ plot_efficiency_of_windows(
 ]
 
 .pull-right[
-&lt;img src="slides_files/figure-html/unnamed-chunk-42-1.png" width="100%" /&gt;
+&lt;img src="slides_files/figure-html/unnamed-chunk-43-1.png" width="100%" /&gt;
 ]
 
 ???
@@ -1301,7 +1317,7 @@ Again, the 100 sets of simulated samples show no significant deviations from the
 # SSE results
 
 .pull-left[
-&lt;img src="slides_files/figure-html/unnamed-chunk-43-1.png" width="100%" /&gt;
+&lt;img src="slides_files/figure-html/unnamed-chunk-44-1.png" width="100%" /&gt;
 ]
 
 .pull-right[
@@ -1426,7 +1442,7 @@ class: inverse, center, middle
 # PK and ANC simulations
 
 .center[
-&lt;img src="slides_files/figure-html/unnamed-chunk-47-1.png" width="80%" /&gt;
+&lt;img src="slides_files/figure-html/unnamed-chunk-48-1.png" width="80%" /&gt;
 ]
 
 ---
@@ -1462,7 +1478,7 @@ class: poll-slide
 
 
 .pull-left[
-&lt;img src="slides_files/figure-html/unnamed-chunk-52-1.png" width="100%" /&gt;
+&lt;img src="slides_files/figure-html/unnamed-chunk-53-1.png" width="100%" /&gt;
 ]
 
 .pull-right[

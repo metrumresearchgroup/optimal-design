@@ -880,9 +880,13 @@ FIM <- evaluate.fim(poped_db)
 det(FIM)
 ```
 
+--
+
 ```{r}
 get_rse(FIM, poped_db)
 ```
+
+--
 
 ```{r}
 poped_db2 <- create.poped.database( poped_db, xt = c(5, c(23, 24, 24, 168)) )
@@ -921,6 +925,8 @@ output <- poped_optim(
 summary(output)
 ```
 ]
+
+--
 
 .pull-right-60[
 .font-90[
@@ -968,6 +974,8 @@ poped_db_extra_ss <- create.poped.database(
   ...
 )
 ```
+
+--
 
 ```{r}
 FIM_extra_ss <- evaluate.fim(poped_db_extra_ss) 
@@ -1018,6 +1026,8 @@ poped_db_final <- create.poped.database(
 )
 ```
 
+--
+
 ```{r}
 FIM_final <- evaluate.fim(poped_db_final) 
 get_rse(FIM_final, poped_db_final)
@@ -1063,6 +1073,11 @@ poped_db_practical <- create.poped.database(
   poped_db_final,
   xt = c(0.5, rep(24, 3), 32, 168)
 )
+```
+
+--
+
+```{r}
 FIM_practical <- evaluate.fim(poped_db_practical) 
 get_rse(FIM_practical, poped_db_practical)
 ```
