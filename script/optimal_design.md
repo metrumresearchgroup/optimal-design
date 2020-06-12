@@ -1,9 +1,59 @@
-Optimal Design for PK/PD
+A Gentle Introduction to Optimal Design for Pharmacometric Models
 ================
 
-TODO
-
-  - SSE for examples
+  - [Optimal design background](#optimal-design-background)
+      - [Fisher information matrix](#fisher-information-matrix)
+      - [Nonlinear mixed effects
+        models](#nonlinear-mixed-effects-models)
+      - [Evaluation vs Optimization](#evaluation-vs-optimization)
+      - [Sampling windows](#sampling-windows)
+  - [Packages and setup](#packages-and-setup)
+  - [Introducing our example](#introducing-our-example)
+      - [The study](#the-study)
+      - [The model](#the-model)
+  - [The `PopED` setup](#the-poped-setup)
+      - [`ff()`](#ff)
+      - [`fg()`](#fg)
+      - [`feps()`](#feps)
+      - [`create.poped.database()`](#create.poped.database)
+      - [Test plot](#test-plot)
+  - [Evaluate FIM](#evaluate-fim)
+  - [*D*-optimal design](#d-optimal-design)
+      - [Starting from the original
+        design](#starting-from-the-original-design)
+      - [Adding another post dose sample at steady
+        state](#adding-another-post-dose-sample-at-steady-state)
+      - [Adding sample after the final (steady-state)
+        dose](#adding-sample-after-the-final-steady-state-dose)
+  - [Near-optimal design](#near-optimal-design)
+  - [Sampling windows](#sampling-windows-1)
+  - [Stochastic Simulation and
+    Estimation](#stochastic-simulation-and-estimation)
+      - [Design 1: proposed sampling.](#design-1-proposed-sampling.)
+      - [Design 2: Near-optimal design with
+        windows](#design-2-near-optimal-design-with-windows)
+  - [A more complex example using
+    `mrgsolve`](#a-more-complex-example-using-mrgsolve)
+      - [The study](#the-study-1)
+      - [The model](#the-model-1)
+      - [`ff()`](#ff-1)
+      - [`fg()`](#fg-1)
+      - [`create.poped.database()`](#create.poped.database-1)
+      - [Test plot](#test-plot-1)
+      - [Evaluate FIM](#evaluate-fim-1)
+      - [Sampling windows](#sampling-windows-2)
+      - [Stochastic Simulation and
+        Estimation](#stochastic-simulation-and-estimation-1)
+  - [PK/PD example: G-CSF](#pkpd-example-g-csf)
+      - [`ff()`](#ff-2)
+      - [`fg()`](#fg-2)
+      - [`feps()`](#feps-1)
+      - [`create.poped.database()`](#create.poped.database-2)
+      - [Test plot](#test-plot-2)
+      - [Evaluate FIM](#evaluate-fim-2)
+      - [Any better doses?](#any-better-doses)
+  - [Other resources](#other-resources)
+  - [References](#references)
 
 This document gives a brief background on optimal design of experiments
 and how it can be applied to studies involving PK/PD models. We give an
@@ -43,7 +93,7 @@ which loosely translates to maximizing the overall precision of
 parameter estimates.
 
 The FIM is typically notated by something like *M*<sub>*F*</sub>(Φ,Ξ),
-where Φ is the vector of parameter values (e.g. *CL*, ω<sub>*CL*</sub>,
+where Φ is the vector of parameter values (e.g. *CL*, ω<sub>*CL*</sub>,
 etc.) and Ξ is the vector of design variables (e.g. dose levels, PK
 sampling times, etc.). For linear models, the dependence on the
 parameters disappears. Unfortunately for us, this is not the case for
@@ -60,8 +110,10 @@ even incorporate uncertainty of the estimates (e.g. with *ED*- or
 More often than not, we’re dealing with nonlinear mixed effects (NLME)
 models. Since the FIM depends on the likelihood function, and there is
 sadly no analytic expression for the likelihood in NLME models, we must
-rely on approximations. See Mentre1997-ds, Retout2001-lw, and
-Retout2003-jx for FIM approximations available to us.
+rely on approximations. See [Mentre, Mallet, and Baccar
+(1997)](#bib-Mentre1997-ds), [Retout, Duffull, and Mentre
+(2001)](#bib-Retout2001-lw), and [Retout and Mentre
+(2003)](#bib-Retout2003-jx) for FIM approximations available to us.
 
 So our FIM is
 
@@ -265,7 +317,7 @@ define a custom function for this as well. The setup is a bit esoteric,
 so we would just start with one of the built-in functions and tweak as
 necessary. There’s only one new argument here:
 
-  - `epsi`: A matrix of residual random effects (i.e. `EPS`s or `ERR`s).
+  - `epsi`: A matrix of residual random effects (i.e. `EPS`s or `ERR`s).
 
 <!-- end list -->
 
@@ -406,21 +458,18 @@ FIM <- evaluate.fim(poped_db)
 det(FIM)
 ```
 
-    . [1] 0.04804063
+    . [1] 0.04804071
 
 This determinant is what will be used to optimize the design, but it’s
 not particularly helpful by itself. What we really need are the
-predicted standard errors based on the
-    FIM.
+predicted standard errors based on the FIM.
 
 ``` r
 get_rse(FIM, poped_db)
 ```
 
-    .      bpop[1]      bpop[2]      bpop[3]       D[1,1]       D[2,2]       D[3,3] 
-    . 2.983332e+05 3.132099e+06 4.936376e+06 5.192188e+01 4.888612e+02 6.485818e+02 
-    .   SIGMA[1,1]   SIGMA[2,2] 
-    . 2.997297e+01 4.082483e+01
+    .      bpop[1]      bpop[2]      bpop[3]       D[1,1]       D[2,2]       D[3,3]   SIGMA[1,1]   SIGMA[2,2] 
+    . 2.983306e+05 3.132072e+06 4.936333e+06 5.192188e+01 4.888612e+02 6.485818e+02 2.997297e+01 4.082483e+01
 
 The RSEs are crazy high, which suggests that the model is not
 identifiable. A slight tweak to a single timepoint (increasing the
@@ -435,10 +484,8 @@ FIM2 <- evaluate.fim(poped_db2)
 get_rse(FIM2, poped_db2)
 ```
 
-    .    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-    .   15.48778  142.08530  223.35925   50.88485  418.53695  549.75962   29.68444 
-    . SIGMA[2,2] 
-    .   40.82396
+    .    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] SIGMA[2,2] 
+    .   15.48778  142.08530  223.35925   50.88485  418.53695  549.75962   29.68444   40.82396
 
 The RSEs are no longer in the millions, but certainly not as low as we’d
 hope for. Let’s see if we can make any improvements with optimization.
@@ -524,10 +571,8 @@ FIM_extra_ss <- evaluate.fim(poped_db_extra_ss)
 get_rse(FIM_extra_ss, poped_db_extra_ss)
 ```
 
-    .    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-    .   13.38487   80.99149  119.36373   46.82132  253.41994  288.82097   24.18497 
-    . SIGMA[2,2] 
-    .   40.80823
+    .    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] SIGMA[2,2] 
+    .   13.38487   80.99149  119.36373   46.82132  253.41994  288.82097   24.18497   40.80823
 
 ``` r
 output_extra_ss <- poped_optim(
@@ -590,10 +635,8 @@ FIM_final <- evaluate.fim(poped_db_final)
 get_rse(FIM_final, poped_db_final)
 ```
 
-    .    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-    .   12.31062   86.75053  136.64068   50.42738  317.03881  419.93344   29.55819 
-    . SIGMA[2,2] 
-    .   28.95827
+    .    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] SIGMA[2,2] 
+    .   12.31062   86.75053  136.64068   50.42738  317.03881  419.93344   29.55819   28.95827
 
 ``` r
 output_final <- poped_optim(
@@ -654,10 +697,8 @@ FIM_practical <- evaluate.fim(poped_db_practical)
 get_rse(FIM_practical, poped_db_practical)
 ```
 
-    .    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
-    .   10.15307   19.61044   22.79548   48.67831   97.63716   74.56113   26.52843 
-    . SIGMA[2,2] 
-    .   40.69749
+    .    bpop[1]    bpop[2]    bpop[3]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] SIGMA[2,2] 
+    .   10.15307   19.61044   22.79548   48.67831   97.63716   74.56113   26.52843   40.69749
 
 ``` r
 plot_model_prediction(
@@ -724,8 +765,7 @@ We’ll need some functions to write out datasets and control streams for
 each replicate.
 
 This first function writes out a CSV dataset with dosing and (to be
-simulated) observations events for a single
-replicate.
+simulated) observations events for a single replicate.
 
 ``` r
 write_data <- function(.design_dir, .run_num, .times = NULL, .times_lo = NULL, .times_hi = NULL) {
@@ -971,32 +1011,31 @@ sum_est(est) %>%
 
 # A more complex example using `mrgsolve`
 
-TODO: clean up this text to match actual model/design
-
 Fakinumab is being studied in humans for the first time.
 
 ## The study
 
-  - Single IV bolus doses of fakinumab: 0.1, 0.3, 1, 3, and 10 mg.
-  - 8 subjects per dose group will be on active drug.
-  - Proposed samples: 1, 4, 8, 12, 24, 48, 168 hours post dose.
+  - Single IV bolus doses of fakinumab: 0.03, 0.1, 0.3, 1, 3, and 10 mg.
+  - 6 subjects per dose group will be on active drug.
+  - Proposed samples: 1 and 4 hours post dose, and 1, 3, 7, 14, 21 days
+    post dose.
 
 ## The model
 
 Based on projections from animal PK data, we predict that a
-2-compartment model with nonlinear clearance from the central
-compartment will desribe the data.
+2-compartment model with linear and nonlinear (Michaelis-Menten)
+clearance from the central compartment will describe the data.
 
-| VMAX | KM | V1 |  Q |  V2 |
-| ---: | -: | -: | -: | --: |
-|   10 | 10 |  8 | 10 | 100 |
+|  CL | VMAX |  KM |  V1 |  Q | V2 |
+| --: | ---: | --: | --: | -: | -: |
+| 0.5 |   20 | 1.2 | 2.5 | 10 |  4 |
 
-We include log-normal IIV on `VMAX`, `KM`, and `V1`, and a proportional
+We include log-normal IIV on `CL`, `VMAX`, and `V1`, and a proportional
 residual error.
 
-| om\_VMAX | om\_KM | om\_V1 | sigma\_prop |
-| -------: | -----: | -----: | ----------: |
-|      0.1 |   0.05 |    0.1 |        0.05 |
+| om\_CL | om\_VMAX | om\_V1 | sigma\_prop |
+| -----: | -------: | -----: | ----------: |
+|    0.2 |      0.2 |    0.1 |        0.15 |
 
 Here is the model in `mrgsolve`. Note that this includes no variability
 yet. The reason for this will become apparently once we start
@@ -1072,8 +1111,8 @@ ff <- function(model_switch, xt, parameters, poped.db) {
 
 ## `fg()`
 
-In this example, we include IIV on `CL`, `VMAX`, `KM`, and `V1`, and
-pass through dose as a covariate.
+In this example, we include IIV on `CL`, `VMAX`, and `V1`, and pass
+through dose as a covariate.
 
 ``` r
 fg <- function(x, a, bpop, b, bocc){
@@ -1132,10 +1171,8 @@ FIM_mrg <- evaluate.fim(poped_db_mrg)
 get_rse(FIM_mrg, poped_db_mrg)
 ```
 
-    .    bpop[1]    bpop[2]    bpop[3]    bpop[4]    bpop[5]    bpop[6]     D[1,1] 
-    .  10.874298  10.660146   7.935583   6.355286   8.894680   3.620177  38.989274 
-    .     D[2,2]     D[3,3] SIGMA[1,1] 
-    .  32.096499  31.667628  10.775830
+    .    bpop[1]    bpop[2]    bpop[3]    bpop[4]    bpop[5]    bpop[6]     D[1,1]     D[2,2]     D[3,3] SIGMA[1,1] 
+    .  10.874541  10.660202   7.935122   6.355306   8.894763   3.620234  38.990317  32.096512  31.668012  10.775738
 
 The RSEs look good.
 
@@ -1284,7 +1321,10 @@ sum_est(est) %>%
 
 # PK/PD example: G-CSF
 
+See the slides for more background on this example.
+
 [Vignette](https://github.com/mrgsolve/depot/blob/master/vignette/gcsf.md)
+
 [Model](https://github.com/mrgsolve/depot/blob/master/pkg/inst/models/gcsf.cpp)
 
 ``` r
@@ -1530,12 +1570,10 @@ FIM_gcsf <- readRDS("FIM_gcsf.rds")
 get_rse(FIM_gcsf, poped_db_gcsf)
 ```
 
-    .    bpop[2]    bpop[5]    bpop[6]    bpop[7]    bpop[8]    bpop[9]   bpop[11] 
-    .   3.289140  13.518742  12.604107   8.265412   3.822461  19.528269   4.066511 
-    .   bpop[13]   bpop[14]   bpop[15]   bpop[16]   bpop[17]     D[1,1]     D[2,2] 
-    .  17.017908  10.771361  20.851250   8.289988   7.664966  26.961113  32.644613 
-    .     D[3,3]     D[5,5]     D[6,6]     D[7,7] SIGMA[1,1] SIGMA[3,3] SIGMA[4,4] 
-    .  31.369081  41.941250  29.156946  26.406506   3.900224   6.541108   7.713365
+    .    bpop[2]    bpop[5]    bpop[6]    bpop[7]    bpop[8]    bpop[9]   bpop[11]   bpop[13]   bpop[14]   bpop[15]   bpop[16] 
+    .   3.289140  13.518742  12.604107   8.265412   3.822461  19.528269   4.066511  17.017908  10.771361  20.851250   8.289988 
+    .   bpop[17]     D[1,1]     D[2,2]     D[3,3]     D[5,5]     D[6,6]     D[7,7] SIGMA[1,1] SIGMA[3,3] SIGMA[4,4] 
+    .   7.664966  26.961113  32.644613  31.369081  41.941250  29.156946  26.406506   3.900224   6.541108   7.713365
 
 ## Any better doses?
 
@@ -1569,22 +1607,36 @@ bind_cols(design = unique(designs[["design"]]), rse_gcsf)
 ```
 
     . # A tibble: 4 x 22
-    .   design `bpop[2]` `bpop[5]` `bpop[6]` `bpop[7]` `bpop[8]` `bpop[9]` `bpop[11]`
-    .   <chr>      <dbl>     <dbl>     <dbl>     <dbl>     <dbl>     <dbl>      <dbl>
-    . 1 Desig…      3.29      13.5      12.6      8.27      3.82      19.5       4.07
-    . 2 Desig…      4.67      22.6      18.1     11.3       4.77      31.5       5.17
-    . 3 Desig…      3.61      16.6      14.6      9.54      4.05      22.2       4.75
-    . 4 Desig…      4.85      22.7      18.1     11.5       4.99      31.9       5.41
-    . # … with 14 more variables: `bpop[13]` <dbl>, `bpop[14]` <dbl>,
-    . #   `bpop[15]` <dbl>, `bpop[16]` <dbl>, `bpop[17]` <dbl>, `D[1,1]` <dbl>,
-    . #   `D[2,2]` <dbl>, `D[3,3]` <dbl>, `D[5,5]` <dbl>, `D[6,6]` <dbl>,
-    . #   `D[7,7]` <dbl>, `SIGMA[1,1]` <dbl>, `SIGMA[3,3]` <dbl>, `SIGMA[4,4]` <dbl>
+    .   design `bpop[2]` `bpop[5]` `bpop[6]` `bpop[7]` `bpop[8]` `bpop[9]` `bpop[11]` `bpop[13]` `bpop[14]` `bpop[15]`
+    .   <chr>      <dbl>     <dbl>     <dbl>     <dbl>     <dbl>     <dbl>      <dbl>      <dbl>      <dbl>      <dbl>
+    . 1 Desig…      3.29      13.5      12.6      8.27      3.82      19.5       4.07       17.0       10.8       20.9
+    . 2 Desig…      4.67      22.6      18.1     11.3       4.77      31.5       5.17       23.3       11.0       24.8
+    . 3 Desig…      3.61      16.6      14.6      9.54      4.05      22.2       4.75       19.5       10.8       21.8
+    . 4 Desig…      4.85      22.7      18.1     11.5       4.99      31.9       5.41       23.8       10.9       26.4
+    . # … with 11 more variables: `bpop[16]` <dbl>, `bpop[17]` <dbl>, `D[1,1]` <dbl>, `D[2,2]` <dbl>, `D[3,3]` <dbl>,
+    . #   `D[5,5]` <dbl>, `D[6,6]` <dbl>, `D[7,7]` <dbl>, `SIGMA[1,1]` <dbl>, `SIGMA[3,3]` <dbl>, `SIGMA[4,4]` <dbl>
 
 # Other resources
 
-  - `PopED` vignette: [Introduction to
-    `PopED`](https://cran.r-project.org/web/packages/PopED/vignettes/intro-poped.html)
-  - `PopED` vignette:
-    [Examples](https://cran.r-project.org/web/packages/PopED/vignettes/intro-poped.html)
-  - mrgsolve wiki: [`PopED`
-    vignette](https://github.com/metrumresearchgroup/mrgsolve/wiki/PopED_vignette)
+  - `PopED`: <https://andrewhooker.github.io/PopED/>
+  - `mrgsolve`: <https://mrgsolve.github.io/>
+  - `babylon`: <https://github.com/metrumresearchgroup/babylon>
+      - `rbabylon`: <https://metrumresearchgroup.github.io/rbabylon/>
+
+# References
+
+<a name=bib-Mentre1997-ds></a>[Mentre, F, A. Mallet, and D.
+Baccar](#cite-Mentre1997-ds) (1997). “Optimal design in random-effects
+regression models”. In: *Biometrika* 84.2, pp. 429-442.
+
+<a name=bib-Retout2001-lw></a>[Retout, S, S. Duffull, and F.
+Mentre](#cite-Retout2001-lw) (2001). “Development and implementation of
+the population Fisher information matrix for the evaluation of
+population pharmacokinetic designs”. In: *Comput. Methods Programs
+Biomed.* 65.2, pp. 141-151.
+
+<a name=bib-Retout2003-jx></a>[Retout, S. and F.
+Mentre](#cite-Retout2003-jx) (2003). “Further developments of the Fisher
+information matrix in nonlinear mixed effects models with evaluation in
+population pharmacokinetics”. In: *J. Biopharm. Stat.* 13.2,
+pp. 209-227.

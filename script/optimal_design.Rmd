@@ -1,20 +1,26 @@
 ---
-title: "Optimal Design for PK/PD"
-order: 99
-tags: ["science-resources", "optimal design", "poped"]
+title: "A Gentle Introduction to Optimal Design for Pharmacometric Models"
 output: 
   github_document:
     toc: true
     toc_depth: 5
 ---
 
-TODO
-
-* SSE for examples
-
-
 ```{r, include = FALSE}
 knitr:::opts_chunk$set(comment = '.', message = FALSE, warning = FALSE)
+```
+
+```{r, load_refs, include=FALSE, cache=FALSE}
+library(RefManageR)
+BibOptions(
+  check.entries = FALSE,
+  bib.style = "authoryear",
+  cite.style = "authoryear",
+  style = "markdown",
+  hyperlink = TRUE,
+  dashed = FALSE
+)
+myBib <- ReadBib("../slides/refs.bib", check = FALSE)
 ```
 
 This document gives a brief background on optimal design of experiments and how it can be applied to studies involving PK/PD models.  We give an example of PK sampling time selection using the R package [`PopED`](https://cran.r-project.org/web/packages/PopED/index.html).  If you don't care about how this works (although you probably should), you can skip the background.
@@ -33,7 +39,7 @@ The FIM is typically notated by something like *M*<sub>*F*</sub>(&Phi;,&Xi;), wh
 
 ## Nonlinear mixed effects models
 
-More often than not, we're dealing with nonlinear mixed effects (NLME) models.  Since the FIM depends on the likelihood function, and there is sadly no analytic expression for the likelihood in NLME models, we must rely on approximations.  See Mentre1997-ds, Retout2001-lw, and Retout2003-jx for FIM approximations available to us.
+More often than not, we're dealing with nonlinear mixed effects (NLME) models.  Since the FIM depends on the likelihood function, and there is sadly no analytic expression for the likelihood in NLME models, we must rely on approximations.  See `r Citet(myBib, "Mentre1997-ds")`, `r Citet(myBib, "Retout2001-lw")`, and `r Citet(myBib, "Retout2003-jx")` for FIM approximations available to us.
 
 So our FIM is
 
@@ -708,32 +714,30 @@ sum_est(est) %>%
 
 # A more complex example using `mrgsolve`
 
-TODO: clean up this text to match actual model/design
-
 Fakinumab is being studied in humans for the first time.
 
 ## The study
 
-* Single IV bolus doses of fakinumab: 0.1, 0.3, 1, 3, and 10 mg.
-* 8 subjects per dose group will be on active drug.
-* Proposed samples: 1, 4, 8, 12, 24, 48, 168 hours post dose.
+* Single IV bolus doses of fakinumab: 0.03, 0.1, 0.3, 1, 3, and 10 mg.
+* 6 subjects per dose group will be on active drug.
+* Proposed samples: 1 and 4 hours post dose, and 1, 3, 7, 14, 21 days post dose.
 
 ## The model
 
-Based on projections from animal PK data, we predict that a 2-compartment model with nonlinear clearance from the central compartment will desribe the data.
+Based on projections from animal PK data, we predict that a 2-compartment model with linear and nonlinear (Michaelis-Menten) clearance from the central compartment will describe the data.
 
 ```{r echo=FALSE}
 tibble(
-  VMAX = 10, KM = 10, V1 = 8, Q = 10, V2 = 100
+  CL = 0.5, VMAX = 20, KM = 1.2, V1 = 2.5, Q = 10, V2 = 4
 ) %>% 
   knitr::kable()
 ```
 
-We include log-normal IIV on `VMAX`, `KM`, and `V1`, and a proportional residual error.
+We include log-normal IIV on `CL`, `VMAX`, and `V1`, and a proportional residual error.
 
 ```{r echo=FALSE}
 tibble(
-  om_VMAX = 0.1, om_KM = 0.05, om_V1 = 0.1, sigma_prop = 0.05
+  om_CL = 0.2, om_VMAX = 0.2, om_V1 = 0.1, sigma_prop = 0.15
 ) %>% 
   knitr::kable()
 ```
@@ -788,7 +792,7 @@ ff <- function(model_switch, xt, parameters, poped.db) {
 
 ## `fg()`
 
-In this example, we include IIV on `CL`, `VMAX`, `KM`, and `V1`, and pass through dose as a covariate.
+In this example, we include IIV on `CL`, `VMAX`, and `V1`, and pass through dose as a covariate.
 
 ```{r}
 fg <- function(x, a, bpop, b, bocc){
@@ -970,7 +974,10 @@ sum_est(est) %>%
 
 # PK/PD example: G-CSF
 
+See the slides for more background on this example.
+
 [Vignette](https://github.com/mrgsolve/depot/blob/master/vignette/gcsf.md)
+
 [Model](https://github.com/mrgsolve/depot/blob/master/pkg/inst/models/gcsf.cpp)
 
 ```{r}
@@ -1241,6 +1248,13 @@ bind_cols(design = unique(designs[["design"]]), rse_gcsf)
 
 # Other resources
 
-* `PopED` vignette: [Introduction to `PopED`](https://cran.r-project.org/web/packages/PopED/vignettes/intro-poped.html)
-* `PopED` vignette: [Examples](https://cran.r-project.org/web/packages/PopED/vignettes/intro-poped.html)
-* mrgsolve wiki: [`PopED` vignette](https://github.com/metrumresearchgroup/mrgsolve/wiki/PopED_vignette)
+* `PopED`: https://andrewhooker.github.io/PopED/
+* `mrgsolve`: https://mrgsolve.github.io/
+* `babylon`: https://github.com/metrumresearchgroup/babylon
+  + `rbabylon`: https://metrumresearchgroup.github.io/rbabylon/
+
+# References
+
+```{r refs, echo=FALSE, results="asis"}
+PrintBibliography(myBib)
+```
