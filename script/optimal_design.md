@@ -817,6 +817,8 @@ write_data <- function(.design_dir, .run_num, .times = NULL, .times_lo = NULL, .
 The next function performs 2 steps for each replicate: (1) take the
 template control stream and adjusts it to point to the relevant dataset
 and set the random seed; and (2) runs the model using `rbabylon`.
+Additional info on the use and functionality of `rbabylon` is available
+at <https://github.com/metrumresearchgroup/rbabylon>.
 
 ``` r
 run_model <- function(.design_dir, .run_num) {
